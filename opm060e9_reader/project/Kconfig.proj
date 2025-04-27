@@ -1,0 +1,14 @@
+#APP specific configuration.
+config CUSTOM_MEM_MAP
+    bool 
+	select custom_mem_map
+	default y    
+
+choice EPD_DRIVER_METHOD
+	prompt "Select EPD driver"
+	default EPD_DRIVER_SOFTWARE
+	config EPD_DRIVER_SOFTWARE
+		bool "Drive EPD with software(Using GPIO to generate waveform)"
+	config EPD_DRIVER_LCDC
+		bool "Drive EPD with LCDC(HW accelerating with LCDC)"
+endchoice
