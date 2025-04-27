@@ -1,0 +1,3 @@
+[submodule "SiFli-SDK"]
+	path = SiFli-SDK
+	url = https://gitlab.sifli.com/sw/SiFli-SDK.git
