@@ -34,20 +34,11 @@ menu "E-Paper Driver"
 
         config EPD_DISPLAY_TYPE_ED097OC4_LQ
             bool "ED097OC4 Low Quality"
-            
+             
         config EPD_EPDIY_EPUB
             bool "EPDIY_EPUB"
     endchoice
 
-
-    choice EPD_EPUB_DRIVER_METHOD
-        prompt "Select EPD_EPUB driver"
-        default EPD_DRIVER_SOFTWARE
-        config EPD_DRIVER_SOFTWARE
-            bool "Drive EPD_EPUB with software(Using GPIO to generate waveform)"
-        config EPD_DRIVER_LCDC
-            bool "Drive EPD_EPUB with LCDC(HW accelerating with LCDC)"
-    endchoice
     
     choice EPD_EPUB_BPP_METHOD
         prompt "Select EPD_EPUB_BPP_METHOD"

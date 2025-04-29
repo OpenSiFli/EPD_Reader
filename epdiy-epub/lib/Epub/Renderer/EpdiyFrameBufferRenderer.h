@@ -4,6 +4,7 @@
 #include <math.h>
 #include "Renderer.h"
 #include "miniz.h"
+#include "epub_mem.h"
 
 #define GAMMA_VALUE (1.0f / 0.8f)
 
@@ -198,7 +199,7 @@ public:
       {
         size_t written = fwrite(compressed, 1, compressed_size, fp);
         fclose(fp);
-        free(compressed);
+        epub_mem_free(compressed);
         if (written != compressed_size)
         {
           ulog_i("EPD", "Failed to write to file");
@@ -226,7 +227,7 @@ public:
       if (compressed_size > 0)
       {
         ulog_i("EPD", "Buffer compressed size: %d", compressed_size);
-        void *compressed = malloc(compressed_size);
+        void *compressed = epub_mem_malloc(compressed_size);
         if (compressed)
         {
           fread(compressed, 1, compressed_size, fp);
@@ -240,7 +241,7 @@ public:
             success = true;
             ulog_i("EPD", "Success decompressing %d bytes", EPD_WIDTH * EPD_HEIGHT / 2);
           }
-          free(compressed);
+          epub_mem_free(compressed);
         }
         else
         {

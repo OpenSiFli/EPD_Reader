@@ -11,7 +11,7 @@
 #include "Epub.h"
 #include "../RubbishHtmlParser/RubbishHtmlParser.h"
 #include "../Renderer/Renderer.h"
-
+#include "epub_mem.h"
 static const char *TAG = "EREADER";
 extern rt_uint32_t heap_free_size(void);
 
@@ -51,7 +51,7 @@ void EpubReader::parse_and_layout_current_section()
     char *html = reinterpret_cast<char *>(epub->get_item_contents(item));
     ulog_d(TAG, "After read html: %d", heap_free_size());
     parser = new RubbishHtmlParser(html, strlen(html), base_path);
-    free(html);
+    epub_mem_free(html);
     ulog_d(TAG, "After parse: %d", heap_free_size());
     parser->layout(renderer, epub);
     ulog_d(TAG, "After layout: %d", heap_free_size());

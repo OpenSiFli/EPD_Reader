@@ -166,6 +166,7 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
 
 void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_redraw)
 {
+  uint32_t start_tick = rt_tick_get();
   switch (ui_state)
   {
   case READING_EPUB:
@@ -179,6 +180,7 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
     handleEpubList(renderer, ui_action, needs_redraw);
     break;
   }
+  rt_kprintf("Renderer time=%d \r\n", rt_tick_get() - start_tick);
 }
 
 // TODO - add the battery level
@@ -300,7 +302,7 @@ void main_task(void *param)
   //ESP_ERROR_CHECK(esp_sleep_enable_ulp_wakeup());
   ulog_i("main", "Entering deep sleep");
   // configure deep sleep options
-  button_controls->setup_deep_sleep();
+  // button_controls->setup_deep_sleep();
   rt_thread_delay(rt_tick_from_millisecond(500));
   // go to sleep
   //esp_deep_sleep_start();

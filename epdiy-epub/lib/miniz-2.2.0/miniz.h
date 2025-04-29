@@ -490,7 +490,7 @@ typedef void *const voidpc;
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include "epub_mem.h"
 
 
 /* ------------------- Types and macros */
@@ -540,9 +540,9 @@ typedef struct mz_dummy_time_t_tag
 #define MZ_FREE(x) (void)x, ((void)0)
 #define MZ_REALLOC(p, x) NULL
 #else
-#define MZ_MALLOC(x) malloc(x)
-#define MZ_FREE(x) free(x)
-#define MZ_REALLOC(p, x) realloc(p, x)
+#define MZ_MALLOC(x) epub_mem_malloc(x)
+#define MZ_FREE(x) epub_mem_free(x)
+#define MZ_REALLOC(p, x)  epub_mem_realloc(p, x)
 #endif
 
 #define MZ_MAX(a, b) (((a) > (b)) ? (a) : (b))

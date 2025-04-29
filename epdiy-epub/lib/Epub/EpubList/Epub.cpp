@@ -6,7 +6,7 @@
 #include "tinyxml2.h"
 #include "../ZipFile/ZipFile.h"
 #include "Epub.h"
-
+#include "epub_mem.h"
 static const char *TAG = "EPUB";
 
 bool Epub::find_content_opf_file(ZipFile &zip, std::string &content_opf_file)
@@ -22,7 +22,7 @@ bool Epub::find_content_opf_file(ZipFile &zip, std::string &content_opf_file)
   tinyxml2::XMLDocument meta_data_doc;
   auto result = meta_data_doc.Parse(meta_info);
   // finished with the data as it's been parsed
-  free(meta_info);
+  epub_mem_free(meta_info);
   if (result != tinyxml2::XML_SUCCESS)
   {
     ulog_e(TAG, "Could not parse META-INF/container.xml");
@@ -67,7 +67,7 @@ bool Epub::parse_content_opf(ZipFile &zip, std::string &content_opf_file)
   // parse the contents
   tinyxml2::XMLDocument doc;
   auto result = doc.Parse(contents);
-  free(contents);
+  epub_mem_free(contents);
   if (result != tinyxml2::XML_SUCCESS)
   {
     ulog_e(TAG, "Error parsing content.opf - %s", doc.ErrorIDToName(result));
@@ -174,7 +174,7 @@ bool Epub::parse_toc_ncx_file(ZipFile &zip)
   // Parse the Toc contents
   tinyxml2::XMLDocument doc;
   auto result = doc.Parse(ncx_data);
-  free(ncx_data);
+  epub_mem_free(ncx_data);
   if (result != tinyxml2::XML_SUCCESS)
   {
     ulog_e(TAG, "Error parsing toc %s", doc.ErrorIDToName(result));

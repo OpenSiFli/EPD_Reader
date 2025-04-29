@@ -82,7 +82,7 @@ void epd_draw_pixel(int x, int y, uint8_t color, uint8_t *framebuffer) {
   if (y < 0 || y >= EPD_HEIGHT) {
     return;
   }
-  #ifdef EPDIY_EPUB_1BPP
+#ifdef EPDIY_EPUB_1BPP
   uint8_t *buf_ptr = &framebuffer[y * (EPD_WIDTH / 8) + x / 8];
   uint8_t bit_mask = 1 << (7 - (x % 8)); 
   if (color > 0x70) {
@@ -90,14 +90,14 @@ void epd_draw_pixel(int x, int y, uint8_t color, uint8_t *framebuffer) {
   } else {
     *buf_ptr &= ~bit_mask; // 设置为黑色（0）
   }
-  #elif EPDIY_EPUB_4BPP
+#elif EPDIY_EPUB_4BPP
   uint8_t *buf_ptr = &framebuffer[y * EPD_WIDTH / 2 + x / 2];
   if (x % 2) {
     *buf_ptr = (*buf_ptr & 0x0F) | (color & 0xF0);
   } else {
     *buf_ptr = (*buf_ptr & 0xF0) | (color >> 4);
   }
-  #endif
+#endif
 }
 
 void epd_draw_circle(int x0, int y0, int r, uint8_t color,

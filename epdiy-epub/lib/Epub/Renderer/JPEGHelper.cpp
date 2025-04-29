@@ -10,6 +10,7 @@
 #endif
 #include "JPEGHelper.h"
 #include "Renderer.h"
+#include "epub_mem.h"
 
 static const char *TAG = "JPG";
 
@@ -17,7 +18,7 @@ static const char *TAG = "JPG";
 
 bool JPEGHelper::get_size(const uint8_t *data, size_t data_size, int *width, int *height)
 {
-  void *pool = malloc(POOL_SIZE);
+  void *pool = epub_mem_malloc(POOL_SIZE);
   if (!pool)
   {
     ulog_e(TAG, "Failed to allocate memory for pool");
@@ -39,7 +40,7 @@ bool JPEGHelper::get_size(const uint8_t *data, size_t data_size, int *width, int
     ulog_e(TAG, "JPEG Decode failed - %d", res);
     return false;
   }
-  free(pool);
+  epub_mem_free(pool);
   m_data = nullptr;
   m_data_pos = 0;
   return true;
@@ -49,7 +50,7 @@ bool JPEGHelper::render(const uint8_t *data, size_t data_size, Renderer *rendere
   this->renderer = renderer;
   this->y_pos = y_pos;
   this->x_pos = x_pos;
-  void *pool = malloc(POOL_SIZE);
+  void *pool = epub_mem_malloc(POOL_SIZE);
   if (!pool)
   {
     ulog_e(TAG, "Failed to allocate memory for pool");
@@ -84,7 +85,7 @@ bool JPEGHelper::render(const uint8_t *data, size_t data_size, Renderer *rendere
   {
     ulog_e(TAG, "JPEG Decode failed - %d", res);
   }
-  free(pool);
+  epub_mem_free(pool);
   m_data = nullptr;
   m_data_pos = 0;
   return res == JDR_OK;

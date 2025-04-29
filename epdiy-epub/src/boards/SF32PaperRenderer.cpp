@@ -11,7 +11,7 @@ extern "C" {
 // #include "opm060e9_driver.h"
 #include <rtdevice.h>
 #include "bf0_hal.h"
-
+// #define EPD_KEY 11
 
 
 void HAL_PostMspInit(void)
@@ -77,7 +77,7 @@ void HAL_PostMspInit(void)
     HAL_PIN_Set(PAD_PA00 + TPS_SDA, I2C2_SDA, PIN_PULLUP, 1);
 
     // key init
-    HAL_PIN_Set(PAD_PA00 + EPD_KEY, (pin_function) (GPIO_A0 + EPD_KEY), PIN_PULLDOWN, 1);
+    // HAL_PIN_Set(PAD_PA00 + EPD_KEY, (pin_function) (GPIO_A0 + EPD_KEY), PIN_PULLDOWN, 1);
 }
 #ifdef __cplusplus
 }

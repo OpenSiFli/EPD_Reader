@@ -10,6 +10,7 @@
 #include <PNGdec.h>
 #include "PNGHelper.h"
 #include "Renderer.h"
+#include "epub_mem.h"
 
 static const char *TAG = "PNG";
 
@@ -48,11 +49,11 @@ bool PNGHelper::render(const uint8_t *data, size_t data_size, Renderer *renderer
     this->x_scale = std::min(1.0f, float(width) / float(png.getWidth()));
     this->y_scale = std::min(1.0f, float(height) / float(png.getHeight()));
     this->last_y = -1;
-    this->tmp_rgb565_buffer = (uint16_t *)malloc(png.getWidth() * 2);
+    this->tmp_rgb565_buffer = (uint16_t *)epub_mem_malloc(png.getWidth() * 2);
 
     png.decode(this, PNG_FAST_PALETTE);
     png.close();
-    free(this->tmp_rgb565_buffer);
+    epub_mem_free(this->tmp_rgb565_buffer);
     return true;
   }
   else

@@ -10,7 +10,7 @@
 #define LOG_D(args...)
 #define LOG_W(args...)
 #endif
-
+#include "epub_mem.h"
 class ImageBlock : public Block
 {
 public:
@@ -43,7 +43,7 @@ public:
     }
     // horizontal center
     x_pos = (renderer->get_page_width() - width) / 2;
-    free(image_data);
+    epub_mem_free(image_data);
   }
   void render(Renderer *renderer, Epub *epub, int y_pos)
   {
@@ -53,7 +53,7 @@ public:
     renderer->fill_rect(x_pos, y_pos, width, height, 255);
     renderer->flush_area(x_pos, y_pos, width, height);
     renderer->draw_image(m_src, image_data, image_data_size, x_pos, y_pos, width, height);
-    free(image_data);
+    epub_mem_free(image_data);
   }
   virtual void dump()
   {

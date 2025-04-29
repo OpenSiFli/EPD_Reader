@@ -2,7 +2,7 @@ from building import *
 import rtconfig
 import os
 
-src = ['main.cpp']
+src = ['main.cpp','epub_mem.c']
 inc = []
 cwd = GetCurrentDir() # get current dir path
 

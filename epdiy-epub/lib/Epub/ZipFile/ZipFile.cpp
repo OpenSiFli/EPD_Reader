@@ -7,7 +7,7 @@
 #include "ZipFile.h"
 
 #include "miniz.h"
-
+#include "epub_mem.h"
 #define TAG "ZIP"
 
 // read a file from the zip file allocating the required memory for the data
@@ -42,7 +42,7 @@ uint8_t *ZipFile::read_file_to_memory(const char *filename, size_t *size)
   }
   // allocate memory for the file
   size_t file_size = file_stat.m_uncomp_size;
-  uint8_t *file_data = (uint8_t *)calloc(file_size + 1, 1);
+  uint8_t *file_data = (uint8_t *)epub_mem_calloc(file_size + 1, 1);
   if (!file_data)
   {
     ulog_e(TAG, "Failed to allocate memory for %s\n", file_stat.m_filename);
@@ -55,7 +55,7 @@ uint8_t *ZipFile::read_file_to_memory(const char *filename, size_t *size)
   {
     ulog_e(TAG, "mz_zip_reader_extract_to_mem() failed!\n");
     ulog_e(TAG, "Error %s\n", mz_zip_get_error_string(zip_archive.m_last_error));
-    free(file_data);
+    epub_mem_free(file_data);
     mz_zip_reader_end(&zip_archive);
     return nullptr;
   }

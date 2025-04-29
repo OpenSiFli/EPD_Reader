@@ -1,4 +1,3 @@
-
 #include "SF32_ButtonControls.h"
 #include "SF32Paper.h"
 #include "button.h"
@@ -75,8 +74,7 @@ UIAction SF32_ButtonControls::get_deep_sleep_action()
 {
   return UIAction::NONE;
 }
+// void SF32_ButtonControls::setup_deep_sleep()
+// {
 
-void SF32_ButtonControls::setup_deep_sleep()
-{
-
-}
+// }

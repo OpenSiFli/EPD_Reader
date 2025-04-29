@@ -1,4 +1,4 @@
-source "D:/work/SDK_master_2/customer/boards/eh-lb563/hcpu/Kconfig.board"
+source "D:/Users/gangqiangzhou/Documents/bt1/customer/boards/sf32-oed-ed/hcpu/Kconfig.board"
 source "$SIFLI_SDK/customer/boards/Kconfig.v2"
 source "$SIFLI_SDK/Kconfig.v2"
 rsource "Kconfig.proj"
