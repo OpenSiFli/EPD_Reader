@@ -31,10 +31,7 @@ public:
       int busy_icon_height)
       : EpdiyFrameBufferRenderer(regular_font, bold_font, italic_font, bold_italic_font, busy_icon, busy_icon_width, busy_icon_height)
   {
-    // driver.begin();
-    // driver.SetColorReverse(true);
-
-    oedtps_init();
+ 
     lcd_device = rt_device_find("lcd");
     if (rt_device_open(lcd_device, RT_DEVICE_OFLAG_RDWR) == RT_EOK)
     {
