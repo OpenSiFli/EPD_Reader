@@ -68,6 +68,20 @@ void SF32Paper::start_filesystem()
     }
 #endif /* RT_USING_SDIO */
 
+#if defined(RT_USING_SPI_MSD)
+    uint16_t time_out = 100;
+    LOG_I("Waitting for SD Card detection done...");
+    while (time_out --)
+    {
+        rt_thread_mdelay(30);
+        if (rt_device_find("sd0"))
+        {
+            LOG_I("Found SD-Card");
+            name[0] = (char *)"sd0";
+            break;
+        }
+    }
+#endif
 
     name[1] = (char *)"flash0";
     register_mtd_device(FS_REGION_START_ADDR, FS_REGION_SIZE, name[1]);

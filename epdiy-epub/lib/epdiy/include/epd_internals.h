@@ -51,10 +51,10 @@
 #define EPD_WIDTH 960
 /// Height of the display area in pixels.
 #define EPD_HEIGHT 540
-#elif defined(EPD_EPDIY_EPUB)
-#define EPD_WIDTH 1448
+#elif defined(LCD_USING_EDP_OPM060E9_V10)
+#define EPD_WIDTH LCD_HOR_RES_MAX
 /// Height of the display area in pixels.
-#define EPD_HEIGHT 1072
+#define EPD_HEIGHT LCD_VER_RES_MAX
 #else
 #error "no display type defined!"
 #endif

@@ -1,17 +1,13 @@
 #APP specific configuration.
+
+comment "------------Project configuration-----------"
+
 config CUSTOM_MEM_MAP
     bool 
 	select custom_mem_map
 	default y    
 
 menu "E-Paper Driver"
-    choice EPD_DRIVER_DISPLAY_TYPE
-        prompt "Display Type"
-        default EPD_EPDIY_EPUB            
-        config EPD_EPDIY_EPUB
-            bool "EPDIY_EPUB"
-    endchoice
-
     
     choice EPD_EPUB_BPP_METHOD
         prompt "Select EPD_EPUB_BPP_METHOD"
