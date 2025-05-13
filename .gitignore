@@ -1,0 +1,13 @@
+*.bak
+*.un~
+*.*~
+*.scvd
+*.old
+*.uvoptx
+/**/build_*/
+/**/build/
+/**/*.pyc
+.sconsign.dblite
+.DS_Store
+.idea
+Kconfig.tmp

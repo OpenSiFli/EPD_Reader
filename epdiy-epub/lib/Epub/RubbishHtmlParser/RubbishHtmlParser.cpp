@@ -192,6 +192,8 @@ void RubbishHtmlParser::layout(Renderer *renderer, Epub *epub)
 {
   const int line_height = renderer->get_line_height();
   const int page_height = renderer->get_page_height();
+
+  ulog_i(TAG, "layout start");
   // first ask the blocks to work out where they should have
   // line breaks based on the page width
   for (auto block : blocks)
@@ -200,6 +202,7 @@ void RubbishHtmlParser::layout(Renderer *renderer, Epub *epub)
     // feed the watchdog
     rt_thread_delay(1);
   }
+  ulog_i(TAG, "Blocks layout done");
   // now we need to allocate the lines to pages
   // we'll run through each block and the lines within each block and allocate
   // them to pages. When we run out of space on a page we'll start a new page
@@ -238,6 +241,8 @@ void RubbishHtmlParser::layout(Renderer *renderer, Epub *epub)
       y += imageBlock->height;
     }
   }
+
+  ulog_i(TAG, "layout done");
 }
 
 void RubbishHtmlParser::render_page(int page_index, Renderer *renderer, Epub *epub)

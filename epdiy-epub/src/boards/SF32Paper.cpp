@@ -31,6 +31,16 @@ void SF32Paper::prepare_to_sleep()
 }
 Renderer *SF32Paper::get_renderer()
 {
+#if 1 //
+  return new SF32PaperRenderer(
+      &regular_font,
+      &regular_font, //&bold_font,
+      &regular_font, //&italic_font,
+      &regular_font, //&bold_italic_font,
+      hourglass_data,
+      hourglass_width,
+      hourglass_height);
+#else
   return new SF32PaperRenderer(
       &regular_font,
       &bold_font,
@@ -39,6 +49,7 @@ Renderer *SF32Paper::get_renderer()
       hourglass_data,
       hourglass_width,
       hourglass_height);
+#endif
 }
 void SF32Paper::start_filesystem()
 {

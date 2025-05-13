@@ -51,7 +51,7 @@ public:
     rt_device_control(lcd_device, RTGRAPHIC_CTRL_SET_BUF_FORMAT, &framebuffer_color_format);
 
      m_frame_buffer = (uint8_t *)framebuffer1;
-    // clear_screen();
+     clear_screen();
   }
   ~SF32PaperRenderer()
   {
@@ -68,7 +68,11 @@ public:
 
     rt_graphix_ops(lcd_device)->draw_rect((const char *)m_frame_buffer, 0, 0, LCD_HOR_RES_MAX - 1, LCD_VER_RES_MAX - 1);
   }
-  
+
+  bool has_gray() 
+  {
+    return false;
+  }
 
   void flush_area(int x, int y, int width, int height)
   {

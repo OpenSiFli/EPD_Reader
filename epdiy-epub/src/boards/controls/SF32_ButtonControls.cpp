@@ -8,26 +8,27 @@ static ActionCallback_t action_cbk ;
 void button_event_handler(int32_t pin, button_action_t action)
 {
    
-  if (pin == BSP_KEY2_PIN)
+  if (pin == EPD_KEY2)
   {
       if (action == BUTTON_CLICKED)
       {
-          action_cbk(UIAction::UP); 
-      } 
-      else if(action == BUTTON_LONG_PRESSED)
-      {       
           action_cbk(UIAction::SELECT); 
       }
-    
   }
-  else if (pin == BSP_KEY1_PIN)
+  else if (pin == EPD_KEY1)
   {
       if (action == BUTTON_CLICKED)
       {
           action_cbk(UIAction::DOWN); 
       }
   }
-
+  else if (pin == EPD_KEY3)
+  {
+      if (action == BUTTON_CLICKED)
+      {
+          action_cbk(UIAction::UP); 
+      }
+  }
 }
 
 
@@ -37,7 +38,7 @@ SF32_ButtonControls::SF32_ButtonControls(
 {
   int32_t id;
   button_cfg_t cfg;
-  cfg.pin = BSP_KEY1_PIN;
+  cfg.pin = EPD_KEY1;
 
   cfg.active_state = BUTTON_ACTIVE_HIGH;
   cfg.mode = PIN_MODE_INPUT;
@@ -49,7 +50,18 @@ SF32_ButtonControls::SF32_ButtonControls(
       RT_ASSERT(0);
   }
  
-  cfg.pin = BSP_KEY2_PIN;
+  cfg.pin = EPD_KEY2;
+  cfg.active_state = BUTTON_ACTIVE_HIGH;
+  cfg.mode = PIN_MODE_INPUT;
+  cfg.button_handler = button_event_handler;
+  id = button_init(&cfg);
+  RT_ASSERT(id >= 0);
+  if (SF_EOK != button_enable(id))
+  {
+      RT_ASSERT(0);
+  }
+
+  cfg.pin = EPD_KEY3;
   cfg.active_state = BUTTON_ACTIVE_HIGH;
   cfg.mode = PIN_MODE_INPUT;
   cfg.button_handler = button_event_handler;
