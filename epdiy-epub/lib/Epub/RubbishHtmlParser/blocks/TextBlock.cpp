@@ -57,9 +57,7 @@ void TextBlock::layout(Renderer *renderer, Epub *epub, int max_width)
   int page_width = max_width != -1 ? max_width : renderer->get_page_width();
   int cur_xpos = 0;
 
-  ulog_i(TAG, "TextBlock::layout page_width=%d, style=%d", page_width,style);
-
-  // measure each word
+    // measure each word
   for (int i = 0; i < spans.size(); i++)
   {
     uint32_t span_length = span_attr[i] >> 8;
@@ -81,7 +79,7 @@ void TextBlock::layout(Renderer *renderer, Epub *epub, int max_width)
 
       int width = renderer->get_fixed_width_words(p_start, &p_end, page_width - cur_xpos, span_style & BOLD_SPAN, span_style & ITALIC_SPAN);
 
-      if((p_start == p_end) || (width <= 0))
+      if((p_start == p_end) || (width < 0))
       {
         ulog_e(TAG, "TextBlock p_start=%x, p_end=%x, span_end=%x, xpos=%d,w=%d", p_start, p_end, p_span_end, cur_xpos, width);
         assert(0);
