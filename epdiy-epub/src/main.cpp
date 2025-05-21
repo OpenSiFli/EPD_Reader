@@ -18,15 +18,9 @@
 extern "C"
 {
   int main();
-  extern rt_uint32_t used_sram_size(void);
-  extern rt_uint32_t max_sram_size(void);
+  rt_uint32_t heap_free_size(void);
 }
 
-
-rt_uint32_t heap_free_size(void)
-{
-  return max_sram_size() - used_sram_size();
-}
 
 const char *TAG = "main";
 

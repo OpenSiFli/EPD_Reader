@@ -255,7 +255,6 @@ void RubbishHtmlParser::render_page(int page_index, Renderer *renderer, Epub *ep
     renderer->flush_display();
   }
 
-#ifdef __EPUB_SF32LB5x__
   if(page_index < pages.size())
   {
     pages.at(page_index)->render(renderer, epub);
@@ -269,17 +268,4 @@ void RubbishHtmlParser::render_page(int page_index, Renderer *renderer, Epub *ep
       renderer->draw_text_box("Reached the limit of the book\nUse the SELECT button",
                               10, y, renderer->get_page_width(), 80, false, false);
   }
-#else
-  try
-    {
-      pages.at(page_index)->render(renderer, epub);
-    } catch (const std::out_of_range &oor) {
-      ulog_i(TAG, "render_page out of range");
-      // This could be nicer. Notice that last word "button" is cut          v
-      uint16_t y = renderer->get_page_height()/2-20;
-      renderer->draw_rect(1, y, renderer->get_page_width(), 105, 125);
-      renderer->draw_text_box("Reached the limit of the book\nUse the SELECT button",
-                              10, y, renderer->get_page_width(), 80, false, false);
-    }
-#endif
 }

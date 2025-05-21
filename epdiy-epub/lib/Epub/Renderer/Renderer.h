@@ -26,6 +26,7 @@ public:
   virtual bool get_image_size(const std::string &filename, const uint8_t *data, size_t data_size, int *width, int *height);
   virtual void draw_pixel(int x, int y, uint8_t color) = 0;
   virtual int get_text_width(const char *text, bool bold = false, bool italic = false) = 0;
+  virtual int get_fixed_width_words(const char *text, const char **end_text, int line_width, bool bold = false, bool italic = false) = 0;
   virtual void draw_text(int x, int y, const char *text, bool bold = false, bool italic = false) = 0;
   virtual void draw_text_box(const std::string &text, int x, int y, int width, int height, bool bold = false, bool italic = false);
   virtual void draw_rect(int x, int y, int width, int height, uint8_t color = 0) = 0;

@@ -390,6 +390,14 @@ void epd_get_text_bounds(const EpdFont *font, const char *string,
                      int *x1, int *y1, int *w, int *h,
                      const EpdFontProperties *props);
 
+/*!
+ * Get the ahead words of 'string' which fits with the 'fixed_width', 
+ * and return the ahead words width, and 'end_text' pointer to the words end.
+ * Set font properties to NULL to use the defaults.
+ */
+int epd_get_fixed_width_words(const EpdFont *font, const char *string,
+                      const char **end_text, unsigned int fixed_width,
+                     const EpdFontProperties *properties);
 /**
  * Write text to the EPD.
  */

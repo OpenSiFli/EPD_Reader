@@ -18,27 +18,32 @@ typedef enum
   RIGHT_ALIGN = 3,
 } BLOCK_STYLE;
 
+typedef struct
+{
+   const char *words_start;
+   const char *words_end;
+   uint16_t words_xpos;
+   uint8_t words_styles;
+}words_desc_type;
+
+
+
 // represents a block of words in the html document
 class TextBlock : public Block
 {
 private:
   // the spans of text in this block
   std::vector<const char *> spans;
-  // pointer to each word
-  std::vector<const char *> words;
-  // width of each word
-  std::vector<uint16_t> word_widths;
-  // x position of each word
-  std::vector<uint16_t> word_xpos;
-  // the styles of each word
-  std::vector<uint8_t> word_styles;
+  // the attributes of spans
+  std::vector<uint32_t> span_attr;
+
 
   // the style of the block - left, center, right aligned
   BLOCK_STYLE style;
 
 public:
   // where do we want to break the words into lines
-  std::vector<uint16_t> line_breaks;
+  std::vector<words_desc_type> line_breaks;
 
   void add_span(const char *span, bool is_bold, bool is_italic);
   TextBlock(BLOCK_STYLE style) : style(style)
@@ -70,7 +75,7 @@ public:
   void dump();
   bool is_empty()
   {
-    return words.empty();
+    return line_breaks.empty();
   }
   virtual BlockType getType()
   {

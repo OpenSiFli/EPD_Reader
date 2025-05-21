@@ -10,6 +10,9 @@ struct rt_memheap epub_psram_memheap;
 L2_NON_RET_BSS_SECT_BEGIN(epub_memheap)
 L2_NON_RET_BSS_SECT(epub_memheap, ALIGN(4) static uint8_t epub_psram_memheap_pool[EPUB_MEMHEAP_POOL_SIZE]);
 L2_NON_RET_BSS_SECT_END
+extern rt_uint32_t used_sram_size(void);
+extern rt_uint32_t max_sram_size(void);
+
 
 static int app_cahe_memheap_init(void)
 {
@@ -67,4 +70,14 @@ void *cxx_mem_allocate(size_t size)
 void cxx_mem_free(void *ptr)
 {
     return epub_mem_free(ptr);
+}
+
+
+
+rt_uint32_t heap_free_size(void)
+{
+    rt_uint32_t heap_free_size = max_sram_size() - used_sram_size();
+    rt_uint32_t psram_heap_free_size = epub_psram_memheap.available_size;
+  
+    return  heap_free_size + psram_heap_free_size;
 }

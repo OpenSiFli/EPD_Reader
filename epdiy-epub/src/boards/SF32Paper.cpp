@@ -31,7 +31,7 @@ void SF32Paper::prepare_to_sleep()
 }
 Renderer *SF32Paper::get_renderer()
 {
-#if 1 //
+#if 1 //Disable italic&bold font to save memory for support chinese font
   return new SF32PaperRenderer(
       &regular_font,
       &regular_font, //&bold_font,

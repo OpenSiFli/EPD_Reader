@@ -114,6 +114,13 @@ public:
     epd_get_text_bounds(get_font(bold, italic), text, &x, &y, &x1, &y1, &x2, &y2, &m_font_props);
     return x2 - x1;
   }
+  
+  //Get the ahead words of 'text' which fits with the line with, and return the ahead words width, and 'end_text' pointer to the last valid one.
+  int get_fixed_width_words(const char *text, const char **end_text, int line_width, bool bold = false, bool italic = false)
+  {
+    return epd_get_fixed_width_words(get_font(bold, italic), text, end_text, line_width, &m_font_props);
+  }
+
   void draw_text(int x, int y, const char *text, bool bold = false, bool italic = false)
   {
     // if using antialised text then set to gray next flush

@@ -13,7 +13,7 @@
 #include "../Renderer/Renderer.h"
 #include "epub_mem.h"
 static const char *TAG = "EREADER";
-extern rt_uint32_t heap_free_size(void);
+extern "C" rt_uint32_t heap_free_size(void);
 
 
 bool EpubReader::load()

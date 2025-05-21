@@ -90,17 +90,21 @@ EpdFontProperties epd_font_properties_default() {
 }
 
 const EpdGlyph* epd_get_glyph(const EpdFont *font, uint32_t code_point) {
-  const EpdUnicodeInterval *intervals = font->intervals;
-  for (int i = 0; i < font->interval_count; i++) {
-    const EpdUnicodeInterval *interval = &intervals[i];
-    if (code_point >= interval->first && code_point <= interval->last) {
-      return &font->glyph[interval->offset + (code_point - interval->first)];
+    const EpdUnicodeInterval *intervals = font->intervals;
+    int left = 0, right = font->interval_count - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        const EpdUnicodeInterval *interval = &intervals[mid];
+        if (code_point < interval->first) {
+            right = mid - 1;
+        } else if (code_point > interval->last) {
+            left = mid + 1;
+        } else {
+            // code_point 在当前区间
+            return &font->glyph[interval->offset + (code_point - interval->first)];
+        }
     }
-    if (code_point < interval->first) {
-      return NULL;
-    }
-  }
-  return NULL;
+    return NULL;
 }
 
 static int uncompress(uint8_t *dest, uint32_t uncompressed_size, const uint8_t *source, uint32_t source_size) {
@@ -262,6 +266,66 @@ void epd_get_text_bounds(const EpdFont *font, const char *string,
   *w = maxx - *x1;
   *y1 = miny;
   *h = maxy - miny;
+}
+
+static bool is_delimiter(uint32_t c)
+{
+  return ((c == ' ' || c == '\r' || c == '\n') || (c >=0x4e00 && c <=0x9fa5));
+}
+
+
+int epd_get_fixed_width_words(const EpdFont *font, const char *string,
+                      const char **end_text, unsigned int fixed_width,
+                     const EpdFontProperties *properties) {
+  // FIXME: Does not respect alignment!
+
+  assert(properties != NULL);
+  EpdFontProperties props = *properties;
+
+  if ((*string == '\0') || (0 == fixed_width)) {
+    *end_text = string;
+    return 0;
+  }
+
+  const char *last_word_end_text = string;
+  int last_word_width = 0;
+
+  int minx = 100000, miny = 100000, maxx = -1, maxy = -1;
+  int temp_x = 0;
+  int temp_y = 0;
+  uint32_t c;
+  while ((c = next_cp((const uint8_t **)&string))) {
+    get_char_bounds(font, c, &temp_x, &temp_y, &minx, &miny, &maxx, &maxy, &props);
+
+    if((maxx - minx) > fixed_width)
+    {
+        break;
+    }
+    if(is_delimiter(c)) //Record last delimiter pointer and width
+    {
+       last_word_end_text = string;
+       last_word_width = maxx - minx;
+    }
+  }
+
+  if((maxx - minx) > fixed_width)
+  {
+    if(last_word_width != 0)
+    {
+      *end_text = last_word_end_text;
+      return last_word_width;
+    }
+    else
+    {
+       *end_text = string;
+       return fixed_width;
+    }
+  }
+  else //Reached the end
+  {
+      *end_text = string;
+      return maxx - minx;
+  }
 }
 
 static enum EpdDrawError epd_write_line(
