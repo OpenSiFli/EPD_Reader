@@ -17,7 +17,7 @@ public:
   virtual float get_voltage()
   {
     
-    return 0;
+    return 3700;
   }
 
   int get_percentage()

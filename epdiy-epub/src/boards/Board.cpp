@@ -21,11 +21,7 @@ void Board::stop_filesystem()
 
 Battery *Board::get_battery()
 {
-#ifdef BATTERY_ADC_CHANNEL
   return new ADCBattery();
-#else
-  return nullptr;
-#endif
 }
 
 TouchControls *Board::get_touch_controls(Renderer *renderer, rt_mq_t ui_queue)

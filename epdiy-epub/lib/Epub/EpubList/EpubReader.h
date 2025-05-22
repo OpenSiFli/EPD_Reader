@@ -18,7 +18,7 @@ private:
 
 public:
   EpubReader(EpubListItem &state, Renderer *renderer) : state(state), renderer(renderer){};
-  ~EpubReader() {}
+  ~EpubReader();
   bool load();
   void next();
   void prev();

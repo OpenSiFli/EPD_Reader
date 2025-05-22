@@ -35,7 +35,7 @@ private:
 
 public:
   EpubToc(EpubListItem &selected_epub, EpubTocState &state, Renderer *renderer) : renderer(renderer), selected_epub(selected_epub), state(state){};
-  ~EpubToc() {}
+  ~EpubToc();
   bool load();
   void next();
   void prev();

@@ -67,6 +67,11 @@ RubbishHtmlParser::~RubbishHtmlParser()
   {
     delete block;
   }
+
+  for (auto page : pages)
+  {
+    delete page;
+  }
 }
 
 bool RubbishHtmlParser::VisitEnter(const tinyxml2::XMLElement &element, const tinyxml2::XMLAttribute *firstAttribute)
@@ -227,7 +232,7 @@ void RubbishHtmlParser::layout(Renderer *renderer, Epub *epub)
         y += line_height;
       }
       // add some extra line between blocks
-      y += line_height * 0.5;
+      y += line_height * 0.8;
     }
     if (block->getType() == BlockType::IMAGE_BLOCK)
     {

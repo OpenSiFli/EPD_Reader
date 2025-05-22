@@ -4,6 +4,14 @@ static const char *TAG = "PUBINDEX";
 #define PADDING 14
 #define ITEMS_PER_PAGE 6
 
+EpubToc::~EpubToc()
+{
+  if (epub)
+  {
+    delete epub;
+  }
+}
+
 void EpubToc::next()
 {
   // must be loaded as we need the information from the epub

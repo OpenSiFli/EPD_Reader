@@ -15,6 +15,10 @@
 static const char *TAG = "EREADER";
 extern "C" rt_uint32_t heap_free_size(void);
 
+  EpubReader::~EpubReader() {
+      if(epub) delete epub;
+      if(parser) delete parser;
+  }
 
 bool EpubReader::load()
 {
