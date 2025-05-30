@@ -10,6 +10,14 @@ def gb2312_to_unicode():
                 unicode_list.append(ord(char))  # 获取 Unicode 编码
             except UnicodeDecodeError:
                 continue
+    for high in range(0xD8, 0xF8):  # GB2312 二级汉字范围
+        for low in range(0xA1, 0xFF):
+            gb2312 = bytes([high, low])
+            try:
+                char = gb2312.decode('gb2312')
+                unicode_list.append(ord(char))  # 获取 Unicode 编码
+            except UnicodeDecodeError:
+                continue
     return sorted(unicode_list)  # 升序排列
 
 def merge_intervals(unicode_list):
@@ -27,7 +35,7 @@ def merge_intervals(unicode_list):
     intervals.append((start, end))  # 添加最后一个区间
     return intervals
 
-# 获取 GB2312 一级汉字的 Unicode 编码
+# 获取 GB2312 一级&二级汉字的 Unicode 编码
 unicode_list = gb2312_to_unicode()
 
 # 合并连续的 Unicode 编码为区间
