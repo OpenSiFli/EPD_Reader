@@ -1,0 +1,10 @@
+from building import *
+
+cwd = GetCurrentDir()
+inc = [cwd]
+src = Glob('*.c')
+lib = [GroupLibName("wfm")]
+CPPPATH = [cwd + '/../common', cwd]
+group = DefineGroup('Drivers', src, depend = [''], CPPPATH = CPPPATH, LIBS=lib, LIBPATH=inc)
+
+Return('group')

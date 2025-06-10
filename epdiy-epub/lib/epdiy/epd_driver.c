@@ -1,5 +1,4 @@
 #include "epd_driver.h"
-#include "epd_temperature.h"
 #include "stdlib.h"
 #include "rtdbg.h"
 

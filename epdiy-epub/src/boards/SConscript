@@ -4,14 +4,12 @@ from building import *
 import rtconfig
 
 cwd = GetCurrentDir()
-src = ['main.cpp','epub_mem.c']
+src = Glob('*.cpp')
 CPPPATH = [cwd]
-
-objs = DefineGroup('src', src,depend = [''],CPPPATH = CPPPATH)
-
-
+objs = DefineGroup('boards', src,depend = [''],CPPPATH = CPPPATH)
 
 list = os.listdir(cwd)
+
 for d in list:
     path = os.path.join(cwd, d)
     if os.path.isfile(os.path.join(path, 'SConscript')):
