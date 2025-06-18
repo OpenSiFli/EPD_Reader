@@ -29,7 +29,7 @@ if !BSP_USING_BUILT_LCD
 
     choice
         prompt "Custom LCD driver"
-        default LCD_USING_EPD_YZC052_V105
+        default LCD_USING_EPD_YZC085_V100
 		
 		config LCD_USING_EPD_R7D005
 			bool "6.0 rect electronic paper display(EPD R7D005_-1.30 1448x1072)"
@@ -37,7 +37,7 @@ if !BSP_USING_BUILT_LCD
 			select LCD_USING_R7D005_130
 			select BSP_LCDC_USING_EPD_8BIT
 
-		config LCD_USING_EPD_YZC052_V105
+		config LCD_USING_EPD_YZC085_V100
 			bool "6.0 rect electronic paper display(EPD YZC052_V1.05 1032x758)"
 			select TSC_USING_FT5446U if BSP_USING_TOUCHD
 			select LCD_USING_YZC085_V100
@@ -47,16 +47,16 @@ if !BSP_USING_BUILT_LCD
     config LCD_HOR_RES_MAX
         int
         default 1448 if LCD_USING_EPD_R7D005
-		default 1032 if LCD_USING_EPD_YZC052_V105
+		default 1032 if LCD_USING_EPD_YZC085_V100
 
     config LCD_VER_RES_MAX
         int
         default 1072 if LCD_USING_EPD_R7D005
-		default 758  if LCD_USING_EPD_YZC052_V105
+		default 758  if LCD_USING_EPD_YZC085_V100
 
     config LCD_DPI
         int
         default 315 if LCD_USING_EPD_R7D005
-		default 300 if LCD_USING_EPD_YZC052_V105
+		default 300 if LCD_USING_EPD_YZC085_V100
 
 endif

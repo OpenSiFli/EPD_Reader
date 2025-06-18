@@ -73,7 +73,7 @@ uint32_t epd_get_clk_freq(void)
 
 uint16_t epd_get_vcom_voltage(void)
 {
-#ifdef LCD_USING_EPD_YZC052_V105
+#ifdef LCD_USING_EPD_YZC085_V100
     return 1050;
 #else
     return 2100;
