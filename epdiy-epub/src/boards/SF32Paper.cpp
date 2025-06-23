@@ -1,10 +1,6 @@
 
 #include "SF32Paper.h"
 #include "SF32PaperRenderer.h"
-#include <regular_font.h>
-#include <bold_font.h>
-#include <italic_font.h>
-#include <bold_italic_font.h>
 #include <hourglass.h>
 #include "SF32_ButtonControls.h"
 
@@ -15,7 +11,10 @@ extern "C" {
 #ifndef _WIN32
     #include "drv_flash.h"
 #endif /* _WIN32 */
-
+extern const EpdFont regular_font;
+extern const EpdFont bold_font;
+extern const EpdFont italic_font;
+extern const EpdFont bold_italic_font;
 
 }
 

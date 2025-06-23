@@ -4,7 +4,7 @@ from building import *
 import rtconfig
 
 cwd = GetCurrentDir()
-src = ['main.cpp','epub_mem.c']
+src = ['main.cpp','epub_mem.c','epub_fonts.c']
 CPPPATH = [cwd]
 
 objs = DefineGroup('src', src,depend = [''],CPPPATH = CPPPATH)
