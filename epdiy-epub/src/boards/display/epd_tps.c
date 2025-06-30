@@ -142,9 +142,9 @@ void oedtps_init(uint16_t vcom_voltage)
     TPS_WAKEUP_L_hs();
     TPS_PWRCOM_L_hs();
     TPS_PWRUP_L_hs();
-    // HAL_Delay(10);
+    HAL_Delay(10);
     TPS_WAKEUP_H_hs();
-    // HAL_Delay(10);
+    HAL_Delay(10);
     oedtps_power_sequence_set();
     oedtps_vposvneg_set();
     oedtps_vcom_set(vcom_voltage);           //VCOM设置

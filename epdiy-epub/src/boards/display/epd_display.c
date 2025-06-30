@@ -71,7 +71,7 @@
 static LCDC_InitTypeDef lcdc_int_cfg =
 {
     .lcd_itf = LCDC_INTF_DBI_8BIT_B,
-    .freq = 0, //Overridden by epd_get_clk_freq()
+    .freq = 0, //Overridden by 'epd_get_timing_config()->sclk_freq'
     .color_mode = LCDC_PIXEL_FORMAT_RGB332,
 
     .cfg = {
@@ -108,7 +108,7 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
 {
     uint8_t   parameter[14];
 
-    lcdc_int_cfg.freq = epd_get_clk_freq();
+    lcdc_int_cfg.freq = epd_get_timing_config()->sclk_freq * 1000*1000; //Set the clock frequency
     /* Initialize LCD low level bus layer ----------------------------------*/
     memcpy(&hlcdc->Init, &lcdc_int_cfg, sizeof(LCDC_InitTypeDef));
     HAL_LCDC_Init(hlcdc);
@@ -135,16 +135,6 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
 
     oedtps_vcom_disable();
     oedtps_source_gate_disable();
-
-    EPD_LE_L_hs();
-    EPD_CLK_L_hs();
-    EPD_OE_L_hs();
-    EPD_SPH_H_hs();
-    EPD_STV_H_hs();
-    EPD_CPV_L_hs();
-    EPD_GMODE_H_hs();
-
-
 
     epd_wave_table();
 
@@ -283,37 +273,6 @@ static int epic_buf_to_wave_form_buffer(uint16_t *p_epic_out_buffer, uint32_t *w
     return 0;
 }
 
-L1_RET_CODE_SECT(epd_codes, void epd_load_and_send_pic(LCDC_HandleTypeDef *hlcdc, const uint16_t *epic_buf, uint32_t epic_buf_len))
-{
-
-    uint8_t *p_lcdc_input = (uint8_t *) &lcdc_input_buffer[lcdc_input_idx][0];
-
-    epic_buf_to_wave_form_buffer((uint16_t *)epic_buf, (uint32_t *)p_lcdc_input, epic_buf_len);
-
-    //Wait previous LCDC done.
-    uint32_t start_tick = HAL_DBG_DWT_GetCycles();
-    while (hlcdc->Instance->STATUS & LCD_IF_STATUS_LCD_BUSY) {;}
-    wait_lcd_ticks += HAL_GetElapsedTick(start_tick, HAL_DBG_DWT_GetCycles());
-
-    EPD_CPV_L_hs();
-    EPD_OE_L_hs();
-    EPD_LE_H_hs();
-    HAL_Delay_us(1);
-    EPD_LE_L_hs();
-    HAL_Delay_us(1);
-    EPD_OE_H_hs();
-    EPD_CPV_H_hs();
-
-
-    hlcdc->Instance->LCD_SINGLE = LCD_IF_LCD_SINGLE_WR_TRIG;
-    while (hlcdc->Instance->LCD_SINGLE & LCD_IF_LCD_SINGLE_LCD_BUSY) {;}
-
-    hlcdc->Instance->LAYER0_SRC = (uint32_t)p_lcdc_input;
-    hlcdc->Instance->COMMAND = 0x1;
-
-    lcdc_input_idx = !lcdc_input_idx;
-}
-
 L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
 {
     uint32_t total_pixels = LCD_HOR_RES_MAX * LCD_VER_RES_MAX;
@@ -386,6 +345,118 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
         RT_ASSERT(0);
 }
 
+//line_type: 0-first line, 1-the middle lines, 2-last line
+L1_RET_CODE_SECT(epd_codes, void epd_load_and_send_pic(LCDC_HandleTypeDef *hlcdc, uint32_t line_type, const uint16_t *epic_buf, uint32_t epic_buf_len))
+{
+    const EPD_TimingConfig *p_timing_config = epd_get_timing_config();
+    uint8_t *p_lcdc_input = (uint8_t *) &lcdc_input_buffer[lcdc_input_idx][0];
+
+    epic_buf_to_wave_form_buffer((uint16_t *)epic_buf, (uint32_t *)p_lcdc_input, epic_buf_len);
+
+    if(0 != line_type)
+    {
+        //Wait previous LCDC done.
+        uint32_t start_tick = HAL_DBG_DWT_GetCycles();
+        while (hlcdc->Instance->STATUS & LCD_IF_STATUS_LCD_BUSY) {;}
+        wait_lcd_ticks += HAL_GetElapsedTick(start_tick, HAL_DBG_DWT_GetCycles());
+
+        //LEL
+        for(uint32_t i = 0; i < p_timing_config->LEL; i++)
+        {
+            hlcdc->Instance->LCD_SINGLE = LCD_IF_LCD_SINGLE_WR_TRIG|LCD_IF_LCD_SINGLE_TYPE_Msk; //Send a SDCLK without change SPH.
+            while (hlcdc->Instance->LCD_SINGLE & LCD_IF_LCD_SINGLE_LCD_BUSY) {;}
+        }
+
+
+        EPD_CPV_L_hs();
+        if(1 == p_timing_config->SDMODE)
+        {
+            EPD_OE_L_hs();
+        }
+    }
+
+
+
+    uint32_t SCLK_half_period = 1 / (p_timing_config->sclk_freq / 2); //Half period in us
+
+    //LSL
+    if(0 == p_timing_config->SDMODE) 
+    {
+        EPD_LE_H_hs();
+    }
+    else
+    {
+        EPD_LE_H_hs();
+        EPD_CPV_H_hs();
+    }
+    HAL_Delay_us(SCLK_half_period);
+
+
+    for(uint32_t i = 0; i < p_timing_config->LSL; i++)
+    {
+        hlcdc->Instance->LCD_SINGLE = LCD_IF_LCD_SINGLE_WR_TRIG|LCD_IF_LCD_SINGLE_TYPE_Msk; //Send a SDCLK without change SPH.
+        while (hlcdc->Instance->LCD_SINGLE & LCD_IF_LCD_SINGLE_LCD_BUSY) {;}
+    }
+
+    EPD_LE_L_hs();
+    HAL_Delay_us(1);
+
+    //LBL
+    for(uint32_t i = 0; i < p_timing_config->LBL; i++)
+    {
+        hlcdc->Instance->LCD_SINGLE = LCD_IF_LCD_SINGLE_WR_TRIG|LCD_IF_LCD_SINGLE_TYPE_Msk;//Send a SDCLK without change SPH.
+        while (hlcdc->Instance->LCD_SINGLE & LCD_IF_LCD_SINGLE_LCD_BUSY) {;}
+    }
+
+    //The first line of LDL
+    if(1 == p_timing_config->SDMODE)
+    {
+        EPD_OE_H_hs();
+    }
+    
+    hlcdc->Instance->LCD_SINGLE = LCD_IF_LCD_SINGLE_WR_TRIG; //Send a SDCLK with a negative SPH pulse.
+    while (hlcdc->Instance->LCD_SINGLE & LCD_IF_LCD_SINGLE_LCD_BUSY) {;}
+    if(0 == p_timing_config->SDMODE)
+    {
+        EPD_CPV_H_hs();
+    }
+
+
+
+
+
+    //LDL Send data
+    hlcdc->Instance->LAYER0_SRC = (uint32_t)p_lcdc_input;
+    hlcdc->Instance->COMMAND = 0x1;
+
+    lcdc_input_idx = !lcdc_input_idx;
+
+
+    if(2 == line_type)
+    {
+        //Wait LCDC done.
+        uint32_t start_tick = HAL_DBG_DWT_GetCycles();
+        while (hlcdc->Instance->STATUS & LCD_IF_STATUS_LCD_BUSY) {;}
+        wait_lcd_ticks += HAL_GetElapsedTick(start_tick, HAL_DBG_DWT_GetCycles());
+
+        //LEL
+        for(uint32_t i = 0; i < p_timing_config->LEL; i++)
+        {
+            hlcdc->Instance->LCD_SINGLE = LCD_IF_LCD_SINGLE_WR_TRIG|LCD_IF_LCD_SINGLE_TYPE_Msk; //Send a SDCLK without change SPH.
+            while (hlcdc->Instance->LCD_SINGLE & LCD_IF_LCD_SINGLE_LCD_BUSY) {;}
+        }
+
+        EPD_CPV_L_hs();
+
+        if(1 == p_timing_config->SDMODE)
+        {
+            EPD_OE_L_hs();
+        }
+
+        uint32_t fclk_half_period = 500 / p_timing_config->fclk_freq; //Half frame clock period in us
+        HAL_Delay_us(fclk_half_period);
+    }
+}
 
 
 L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
@@ -393,6 +464,16 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
     uint32_t line, line_bytes;
     //波形帧数量，用于局刷和全刷控制
     unsigned int frame_times = 0;
+    const EPD_TimingConfig *p_timing_config = epd_get_timing_config();
+
+    //Initialize the pins output
+    EPD_LE_L_hs();
+    EPD_CLK_L_hs();
+    EPD_OE_L_hs();
+    EPD_STV_H_hs();
+    EPD_CPV_L_hs();
+    EPD_GMODE_H_hs();
+
 
 
 
@@ -418,41 +499,57 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
     line_bytes = LCD_HOR_RES_MAX;
     wait_lcd_ticks = 0;
     lut_copy_ticks = 0;
-    EPD_GMODE_H_hs();
     for (uint32_t frame = 0; frame < frame_times; frame++)
     {
         prepare_epic_lut(frame);
-        EPD_STV_H_hs();
+
+
+        uint32_t fclk_half_period = 500 / p_timing_config->fclk_freq; //Half frame clock period in us
+        //GMODE 
+        EPD_GMODE_L_hs();
+        HAL_Delay_us(fclk_half_period);
+        EPD_GMODE_H_hs();
+        HAL_Delay_us(fclk_half_period);
+
+        //FSL
         EPD_STV_L_hs();
-        HAL_Delay_us(1);
-        EPD_CPV_L_hs();    //DCLK跑1个时钟
-        HAL_Delay_us(1);
-        EPD_CPV_H_hs();
-        HAL_Delay_us(1);
-        EPD_STV_H_hs();
-        HAL_Delay_us(1);
-        EPD_CPV_L_hs();    //DCLK跑1个时钟
-        HAL_Delay_us(1);
-        EPD_CPV_H_hs();
-        HAL_Delay_us(1);
-        EPD_CPV_L_hs();    //DCLK跑1个时钟
-        HAL_Delay_us(1);
-        EPD_CPV_H_hs();
-        HAL_Delay_us(1);
-        EPD_CPV_L_hs();
-        EPD_LE_H_hs();
-        HAL_Delay_us(1);
-        EPD_LE_L_hs();
-        HAL_Delay_us(1);
-        EPD_OE_H_hs();
-        EPD_CPV_H_hs();
+        HAL_Delay_us(fclk_half_period);
+        for(uint32_t _i = 0; _i < p_timing_config->FSL; _i++)
+        {
+            //1 CKV positve pulse
+            EPD_CPV_H_hs();
+            HAL_Delay_us(fclk_half_period);
+            //Pull up STV before last CKV pulse
+            if(_i == p_timing_config->FSL - 1) EPD_STV_H_hs();
+            EPD_CPV_L_hs();
+            HAL_Delay_us(fclk_half_period);
+        }
+
+        //FBL
+        for(uint32_t _i = 0; _i < p_timing_config->FBL; _i++)
+        {
+            //1 CKV positve pulse
+            EPD_CPV_H_hs();
+            HAL_Delay_us(fclk_half_period);
+            EPD_CPV_L_hs();
+            HAL_Delay_us(fclk_half_period);
+        }
+
+
+        if(0 == p_timing_config->SDMODE) EPD_OE_H_hs();
+
 
         uint16_t *cur_line_epic_out = NULL;
         uint16_t *next_line_epic_out = NULL;
         for (line = 0; line < DISPLAY_ROWS; line++)                 //共有DISPLAY_ROWS列数据
         {
+            uint32_t line_type = 1;//中间行
+
             if (NULL == next_line_epic_out)
+            {
+                line_type = 0; //第一行
                 cur_line_epic_out = mixed_gray_to_epic_out(&mixed_framebuffer[line * line_bytes], LCD_HOR_RES_MAX);
+            }
             else
             {
                 cur_line_epic_out = next_line_epic_out; //如果下一行已经转换过了，就复用它
@@ -462,25 +559,33 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
             if (line < DISPLAY_ROWS - 1)
                 next_line_epic_out = mixed_gray_to_epic_out(&mixed_framebuffer[(line + 1) * line_bytes], LCD_HOR_RES_MAX);
             else
+            {
+                line_type = 2; //最后一行
                 next_line_epic_out = NULL; //最后一行没有下一行了
+            }
 
 
-            epd_load_and_send_pic(hlcdc, cur_line_epic_out, LCD_HOR_RES_MAX); //传完一列数据后传下一列，一列数据有
+            epd_load_and_send_pic(hlcdc, line_type, cur_line_epic_out, LCD_HOR_RES_MAX); //传完一列数据后传下一列，一列数据有
         }
-        epd_load_and_send_pic(hlcdc, cur_line_epic_out, LCD_HOR_RES_MAX); //最后一行还需GATE CLK,故再传一行没用数据
-        while (hlcdc->Instance->STATUS & LCD_IF_STATUS_LCD_BUSY) {;}
 
 
-        EPD_CPV_L_hs();
-        HAL_Delay_us(1);
-        EPD_OE_L_hs();
+        if(0 == p_timing_config->SDMODE) EPD_OE_L_hs();
+
+        //FEL
+        for(uint32_t _i = 0; _i < p_timing_config->FEL; _i++)
+        {
+            //1 CKV positve pulse
+            EPD_CPV_H_hs();
+            HAL_Delay_us(fclk_half_period);
+            EPD_CPV_L_hs();
+            HAL_Delay_us(fclk_half_period);
+        }
+
     }
     unlock_epic();
-    EPD_GMODE_L_hs();
     EPD_LE_L_hs();
     EPD_CLK_L_hs();
     EPD_OE_L_hs();
-    EPD_SPH_H_hs();
     EPD_STV_H_hs();
     EPD_CPV_L_hs();
 
@@ -492,6 +597,8 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
           rt_tick_get() - start_tick, wait_lcd_ticks / 240,
           lut_copy_ticks / 240);
 
+    EPD_GMODE_L_hs();
+    EPD_STV_L_hs();
 
     /* Simulate LCDC IRQ handler, call user callback */
     if (hlcdc->XferCpltCallback)
