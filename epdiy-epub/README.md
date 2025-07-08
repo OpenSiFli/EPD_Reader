@@ -143,11 +143,26 @@ void epd_wave_table_fill_lut(uint32_t *p_epic_lut, uint32_t frame_num)
         p_epic_lut[i] = p_frame_wave[i] << 3;
 }
 ```
-* 3、根据屏驱文档，获取电子书显示的时钟频率，单位为Hz。返回24MHz的时钟频率，提供驱动芯片的工作时钟频率参数，根据不同的驱动配置不同的频率。
+* 3、根据屏驱文档对照下列参数，调整时序及频率。对照文档获取频率SDCLK->sclk_freq,frame clock->fclk_freq,提供驱动芯片的工作时钟频率参数，根据不同的驱动配置不同的频率。
 ```c
-uint32_t epd_get_clk_freq(void)
+const EPD_TimingConfig *epd_get_timing_config(void)
 {
-    return 24 * 1000 * 1000; // 24MHz
+    static const EPD_TimingConfig timing_config = {
+        .sclk_freq = 24,
+        .SDMODE = 0,
+        .LSL = 0,
+        .LBL = 0,
+        .LDL = LCD_HOR_RES_MAX/4,
+        .LEL = 1,
+
+        .fclk_freq = 83,
+        .FSL = 1,
+        .FBL = 3,
+        .FDL = LCD_VER_RES_MAX,
+        .FEL = 5,
+    };
+
+    return &timing_config;
 }
 ```
 * 4、提供电子书显示所需的参考电压，确保显示效果稳定。新屏幕的VCOM电压可能不同，需要查阅新屏幕规格书，修改返回值。
@@ -156,7 +171,6 @@ uint16_t epd_get_vcom_voltage(void)
 {
     return 2100;
 }
-```
 4、在Kconfig文件中增加驱动IC的宏定义
 打开`epd_reader\epdiy-epub\project\Kconfig.proj`文件里面有很多类似LCD_USING_XXX的config，在后面添加新的config：
 ```c
