@@ -237,37 +237,102 @@ static uint16_t *mixed_gray_to_epic_out(unsigned char *gray_buffer, uint32_t gra
 
     return p_epic_out;
 }
-
-static int epic_buf_to_wave_form_buffer(uint16_t *p_epic_out_buffer, uint32_t *wfm_buffer, uint32_t epic_out_buffer_len)
+static inline int epic_buf_to_wave_form_buffer(uint16_t *p_epic_out_buffer, uint32_t *wfm_buffer, uint32_t epic_out_buffer_len)
 {
     int index = 0;
 
-    for (int i = 0; i < epic_out_buffer_len; i += 16)
+    for (int i = 0; i < epic_out_buffer_len; i += 32)
     {
-        int out_v = 0;
+        uint32_t out_v0 = 0, out_v1 = 0;
+        __asm__ volatile (
+            // 第1组16个像素，每次加载2个
+            "ldrh r1, [%[buf], #0]    \n\t"
+            "ldrh r2, [%[buf], #2]    \n\t"
+            "orr  %[out0], %[out0], r1, lsl #6   \n\t"
+            "orr  %[out0], %[out0], r2, lsl #4   \n\t"
 
-        out_v |= p_epic_out_buffer[0] << 6;
-        out_v |= p_epic_out_buffer[1] << 4;
-        out_v |= p_epic_out_buffer[2] << 2;
-        out_v |= p_epic_out_buffer[3] << 0;
+            "ldrh r1, [%[buf], #4]    \n\t"
+            "ldrh r2, [%[buf], #6]    \n\t"
+            "orr  %[out0], %[out0], r1, lsl #2   \n\t"
+            "orr  %[out0], %[out0], r2, lsl #0   \n\t"
 
-        out_v |= p_epic_out_buffer[4] << 14;
-        out_v |= p_epic_out_buffer[5] << 12;
-        out_v |= p_epic_out_buffer[6] << 10;
-        out_v |= p_epic_out_buffer[7] << 8;
+            "ldrh r1, [%[buf], #8]    \n\t"
+            "ldrh r2, [%[buf], #10]   \n\t"
+            "orr  %[out0], %[out0], r1, lsl #14  \n\t"
+            "orr  %[out0], %[out0], r2, lsl #12  \n\t"
 
-        out_v |= p_epic_out_buffer[8] << 22;
-        out_v |= p_epic_out_buffer[9] << 20;
-        out_v |= p_epic_out_buffer[10] << 18;
-        out_v |= p_epic_out_buffer[11] << 16;
+            "ldrh r1, [%[buf], #12]   \n\t"
+            "ldrh r2, [%[buf], #14]   \n\t"
+            "orr  %[out0], %[out0], r1, lsl #10  \n\t"
+            "orr  %[out0], %[out0], r2, lsl #8   \n\t"
 
-        out_v |= p_epic_out_buffer[12] << 30;
-        out_v |= p_epic_out_buffer[13] << 28;
-        out_v |= p_epic_out_buffer[14] << 26;
-        out_v |= p_epic_out_buffer[15] << 24;
+            "ldrh r1, [%[buf], #16]   \n\t"
+            "ldrh r2, [%[buf], #18]   \n\t"
+            "orr  %[out0], %[out0], r1, lsl #22  \n\t"
+            "orr  %[out0], %[out0], r2, lsl #20  \n\t"
 
-        wfm_buffer[index++] = out_v;
-        p_epic_out_buffer += 16;
+            "ldrh r1, [%[buf], #20]   \n\t"
+            "ldrh r2, [%[buf], #22]   \n\t"
+            "orr  %[out0], %[out0], r1, lsl #18  \n\t"
+            "orr  %[out0], %[out0], r2, lsl #16  \n\t"
+
+            "ldrh r1, [%[buf], #24]   \n\t"
+            "ldrh r2, [%[buf], #26]   \n\t"
+            "orr  %[out0], %[out0], r1, lsl #30  \n\t"
+            "orr  %[out0], %[out0], r2, lsl #28  \n\t"
+
+            "ldrh r1, [%[buf], #28]   \n\t"
+            "ldrh r2, [%[buf], #30]   \n\t"
+            "orr  %[out0], %[out0], r1, lsl #26  \n\t"
+            "orr  %[out0], %[out0], r2, lsl #24  \n\t"
+
+            // 第2组16个像素，每次加载2个
+            "ldrh r1, [%[buf], #32]   \n\t"
+            "ldrh r2, [%[buf], #34]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #6   \n\t"
+            "orr  %[out1], %[out1], r2, lsl #4   \n\t"
+
+            "ldrh r1, [%[buf], #36]   \n\t"
+            "ldrh r2, [%[buf], #38]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #2   \n\t"
+            "orr  %[out1], %[out1], r2, lsl #0   \n\t"
+
+            "ldrh r1, [%[buf], #40]   \n\t"
+            "ldrh r2, [%[buf], #42]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #14  \n\t"
+            "orr  %[out1], %[out1], r2, lsl #12  \n\t"
+
+            "ldrh r1, [%[buf], #44]   \n\t"
+            "ldrh r2, [%[buf], #46]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #10  \n\t"
+            "orr  %[out1], %[out1], r2, lsl #8   \n\t"
+
+            "ldrh r1, [%[buf], #48]   \n\t"
+            "ldrh r2, [%[buf], #50]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #22  \n\t"
+            "orr  %[out1], %[out1], r2, lsl #20  \n\t"
+
+            "ldrh r1, [%[buf], #52]   \n\t"
+            "ldrh r2, [%[buf], #54]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #18  \n\t"
+            "orr  %[out1], %[out1], r2, lsl #16  \n\t"
+
+            "ldrh r1, [%[buf], #56]   \n\t"
+            "ldrh r2, [%[buf], #58]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #30  \n\t"
+            "orr  %[out1], %[out1], r2, lsl #28  \n\t"
+
+            "ldrh r1, [%[buf], #60]   \n\t"
+            "ldrh r2, [%[buf], #62]   \n\t"
+            "orr  %[out1], %[out1], r1, lsl #26  \n\t"
+            "orr  %[out1], %[out1], r2, lsl #24  \n\t"
+            : [out0] "+r" (out_v0), [out1] "+r" (out_v1)
+            : [buf] "r" (p_epic_out_buffer)
+            : "r1", "r2"
+        );
+        wfm_buffer[index++] = out_v0;
+        wfm_buffer[index++] = out_v1;
+        p_epic_out_buffer += 32;
     }
 
     return 0;
@@ -346,7 +411,7 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
 }
 
 //line_type: 0-first line, 1-the middle lines, 2-last line
-L1_RET_CODE_SECT(epd_codes, void epd_load_and_send_pic(LCDC_HandleTypeDef *hlcdc, uint32_t line_type, const uint16_t *epic_buf, uint32_t epic_buf_len))
+void epd_load_and_send_pic(LCDC_HandleTypeDef *hlcdc, uint32_t line_type, const uint16_t *epic_buf, uint32_t epic_buf_len)
 {
     const EPD_TimingConfig *p_timing_config = epd_get_timing_config();
     uint8_t *p_lcdc_input = (uint8_t *) &lcdc_input_buffer[lcdc_input_idx][0];

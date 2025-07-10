@@ -3,6 +3,7 @@
 #include "SF32PaperRenderer.h"
 #include <hourglass.h>
 #include "SF32_ButtonControls.h"
+#include "SF32_TouchControls.h"
 
 extern "C" {
 #include "dfs_fs.h"
@@ -127,3 +128,12 @@ ButtonControls *SF32Paper::get_button_controls(rt_mq_t ui_queue)
     }
   );
 }
+
+TouchControls *SF32Paper::get_touch_controls(Renderer *renderer, rt_mq_t ui_queue)
+{
+  return new SF32_TouchControls(renderer, [ui_queue](UIAction action)
+  {
+    rt_mq_send(ui_queue, &action, sizeof(UIAction));
+  });
+}
+

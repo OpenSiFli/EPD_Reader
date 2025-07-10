@@ -1,43 +1,74 @@
-#ifdef USE_L58_TOUCH
 
 #include "SF32_TouchControls.h"
 #include <Renderer/Renderer.h>
 #include "epd_driver.h"
+#ifdef BSP_USING_TOUCHD
+    #include "drv_touch.h"
+#endif
 
-void touchTask(void *param)
+rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 {
-  SF32_TouchControls *controls = (SF32_TouchControls *)param;
-  for (;;)
+    SF32_TouchControls *instance = static_cast<SF32_TouchControls*> (dev->user_data);
+    struct touch_message touch_data;
+    rt_uint16_t x,y;
+
+    /*Read touch point data*/
+    rt_device_read(dev, 0, &touch_data, 1);
+
+    //Rotate anti-clockwise 90 degree
+    x = LCD_VER_RES_MAX - touch_data.y - 1;
+    y = touch_data.x;
+    
+
+    if (TOUCH_EVENT_DOWN == touch_data.event)
+        rt_kprintf("Touch down [%d,%d]\r\n", x, y);
+    else
+        rt_kprintf("Touch up   [%d,%d]\r\n", x, y);
+
+
+
+  UIAction action = NONE;
+  // LOG_I("TOUCH", "Received touch event %d,%d", x, y);
+  if (x >= 10 && x <= 10 + instance->ui_button_width && y < 200)
   {
-    controls->ts->loop();
+    action = DOWN;
+    instance->renderPressedState(instance->renderer, UP, false);
   }
-}
-
-// stash the instance - TODO - update the touch library to use std::function for callbacks so
-// it can take lambdas
-static SF32_TouchControls *instance = nullptr;
-
-void touchHandler(TPoint p, TEvent e)
-{
-  if (e == TEvent::Tap && instance)
+  else if (x >= 150 && x <= 150 + instance->ui_button_width && y < 200)
   {
-    instance->handleTouch(p.x, p.y);
+    action = UP;
+    instance->renderPressedState(instance->renderer, DOWN, false);
   }
+  else if (x >= 300 && x <= 300 + instance->ui_button_width && y < 200)
+  {
+    action = SELECT;
+  }
+  else
+  {
+
+  }
+  instance->last_action = action;
+  if (action != NONE)
+  {
+    instance->on_action(action);
+  }
+    
+    return RT_EOK;
 }
 
-SF32_TouchControls::SF32_TouchControls(Renderer *renderer, int touch_int, int width, int height, int rotation, ActionCallback_t on_action)
-    : on_action(on_action), renderer(renderer)
+SF32_TouchControls::SF32_TouchControls(Renderer *renderer, ActionCallback_t on_action)
+  : on_action(on_action), renderer(renderer)
 {
-  instance = this;
-  this->ts = new L58Touch(touch_int);
-  /** Instantiate touch. Important inject here the display width and height size in pixels
-        setRotation(3)     Portrait mode */
-  ts->begin(width, height);
-  ts->setRotation(rotation);
-  ts->setTapThreshold(50);
-  ts->registerTouchHandler(touchHandler);
-  xTaskCreate(touchTask, "touchTask", 4096, this, 0, NULL);
+    tp_device = rt_device_find("touch");
+
+      if (RT_EOK == rt_device_open(tp_device, RT_DEVICE_FLAG_RDONLY))
+      {
+          /*Setup rx indicate callback*/
+          tp_device->user_data = (void *)this;
+          rt_device_set_rx_indicate(tp_device, tp_rx_indicate);
+      }
 }
+
 
 void SF32_TouchControls::render(Renderer *renderer)
 {
@@ -74,7 +105,7 @@ void SF32_TouchControls::renderPressedState(Renderer *renderer, UIAction action,
     {
       renderer->fill_triangle(81, 19, 76, 7, 86, 7, 255);
     }
-    renderer->flush_area(76, 6, 10, 15);
+    //renderer->flush_area(76, 6, 10, 15);
     break;
   }
   case UP:
@@ -87,14 +118,14 @@ void SF32_TouchControls::renderPressedState(Renderer *renderer, UIAction action,
     {
       renderer->fill_triangle(221, 7, 221 - 5, 19, 221 + 5, 19, 255);
     }
-    renderer->flush_area(195, 225, 10, 15);
+    //renderer->flush_area(195, 225, 10, 15);
   }
   break;
   case SELECT:
   {
     uint16_t x_circle = (ui_button_width * 2 + 60) + (ui_button_width / 2) + 9;
     renderer->fill_circle(x_circle, 15, 5, 0);
-    renderer->flush_area(x_circle - 3, 12, 6, 6);
+    //renderer->flush_area(x_circle - 3, 12, 6, 6);
     // TODO - this causes a stack overflow when select is picked
     // renderPressedState(renderer, last_action, false);
   }
@@ -105,34 +136,3 @@ void SF32_TouchControls::renderPressedState(Renderer *renderer, UIAction action,
   }
   renderer->set_margin_top(35);
 }
-
-void SF32_TouchControls::handleTouch(int x, int y)
-{
-  UIAction action = NONE;
-  ulog_i("TOUCH", "Received touch event %d,%d", x, y);
-  if (x >= 10 && x <= 10 + ui_button_width && y < 200)
-  {
-    action = DOWN;
-    renderPressedState(renderer, UP, false);
-  }
-  else if (x >= 150 && x <= 150 + ui_button_width && y < 200)
-  {
-    action = UP;
-    renderPressedState(renderer, DOWN, false);
-  }
-  else if (x >= 300 && x <= 300 + ui_button_width && y < 200)
-  {
-    action = SELECT;
-  }
-  else
-  {
-    // Touched anywhere but not the buttons
-    action = LAST_INTERACTION;
-  }
-  last_action = action;
-  if (action != NONE)
-  {
-    on_action(action);
-  }
-}
-#endif
