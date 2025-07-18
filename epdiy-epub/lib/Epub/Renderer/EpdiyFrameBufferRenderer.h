@@ -129,6 +129,19 @@ public:
     int xpos = x + margin_left;
     epd_write_string(get_font(bold, italic), text, &xpos, &ypos, m_frame_buffer, &m_font_props);
   }
+
+  int draw_text2(int x, int y, const char *text, bool bold = false, bool italic = false)
+  {
+    // if using antialised text then set to gray next flush
+    // needs_gray_flush = true;
+    int ypos = y + get_line_height() + margin_top;
+    int xpos = x + margin_left;
+    int xpos_before = xpos;
+    epd_write_string(get_font(bold, italic), text, &xpos, &ypos, m_frame_buffer, &m_font_props);
+
+    return xpos - xpos_before;
+  }
+
   void draw_rect(int x, int y, int width, int height, uint8_t color = 0)
   {
     needs_gray(color);

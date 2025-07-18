@@ -13,31 +13,76 @@
 
 static const char *TAG = "TextBlock";
 
+typedef struct {
+  uint8_t mask;    /* char data will be bitwise AND with this */
+  uint8_t lead;    /* start bytes of current char in utf-8 encoded character */
+  uint32_t beg;    /* beginning of codepoint range */
+  uint32_t end;    /* end of codepoint range */
+  int bits_stored; /* the number of bits from the codepoint that fits in char */
+} utf_t;
+/*
+ * UTF-8 decode inspired from rosetta code
+ * https://rosettacode.org/wiki/UTF-8_encode_and_decode#C
+ */
+static const utf_t utf[] = {
+    /*             mask        lead        beg      end       bits */
+    {0b00111111, 0b10000000, 0, 0, 6},
+    {0b01111111, 0b00000000, 0000, 0177, 7},
+    {0b00011111, 0b11000000, 0200, 03777, 5},
+    {0b00001111, 0b11100000, 04000, 0177777, 4},
+    {0b00000111, 0b11110000, 0200000, 04177777, 3},
+};
+
+static int utf8_len(const char ch)
+{
+
+
+	int len = 0;
+	for(int i = 0; i < sizeof(utf); ++i) {
+		if((ch & ~utf[i].mask) == utf[i].lead) {
+			break;
+		}
+		++len;
+	}
+	if(len > 4) { /* Malformed leading byte */
+		assert("invalid unicode.");
+	}
+	return len;
+}
+
 // TODO - is there any more whitespace we should consider?
 static bool is_whitespace(char c)
 {
   return (c == ' ' || c == '\r' || c == '\n');
 }
 
-// move past anything that should be considered part of a work
-static int skip_word(const char *text, int index, int length)
+// move past anything that should be considered part of a word
+static const char *skip_word(const char *start, const char *end)
 {
-  while (index < length && !is_whitespace(text[index]))
+  const char *cursor = start;
+  while (cursor < end && !is_whitespace(*cursor))
   {
-    index++;
+    int len = utf8_len(*cursor);
+
+    if(len > 1) //Anything longer than 1 byte is considered as a word
+    {
+      cursor += len; 
+      break;
+    }
+    else
+    {
+      cursor++;
+    }
   }
-  return index;
-}
- 
-// skip past any white space characters
-static int skip_whitespace(const char *html, int index, int length)
-{
-  while (index < length && is_whitespace(html[index]))
+
+  //Skip white space
+  while (cursor < end && is_whitespace(*cursor))
   {
-    index++;
+    cursor++;
   }
-  return index;
+  return cursor;
 }
+
 
 void TextBlock::add_span(const char *span, bool is_bold, bool is_italic)
 {
@@ -74,35 +119,47 @@ void TextBlock::layout(Renderer *renderer, Epub *epub, int max_width)
 
     do{
 
-      words_desc_type desc;
+      line_desc_type desc;
       //Get the words fits to current line
 
-      int width = renderer->get_fixed_width_words(p_start, &p_end, page_width - cur_xpos, span_style & BOLD_SPAN, span_style & ITALIC_SPAN);
+      int width = renderer->get_fixed_width_words(p_start, &p_end, page_width, span_style & BOLD_SPAN, span_style & ITALIC_SPAN);
 
       if((p_start == p_end) || (width < 0))
       {
-        ulog_e(TAG, "TextBlock p_start=%x, p_end=%x, span_end=%x, xpos=%d,w=%d", p_start, p_end, p_span_end, cur_xpos, width);
+        ulog_e(TAG, "TextBlock p_start=%x, p_end=%x, span_end=%x, w=%d", p_start, p_end, p_span_end, width);
         assert(0);
+      }
+
+      if ((p_end != p_span_end) && style == JUSTIFIED)
+      {
+          desc.spare_width = page_width - width;
+      }
+      else
+      {
+          desc.spare_width = 0;
       }
 
       if (style == RIGHT_ALIGN)
       {
-        cur_xpos = page_width - width;
+        desc.words_xpos = page_width - width;
       }
-      if (style == CENTER_ALIGN)
+      else if (style == CENTER_ALIGN)
       {
-        cur_xpos = (page_width - width) / 2;
+        desc.words_xpos = (page_width - width) / 2;
+      }
+      else
+      {
+        desc.words_xpos = 0;
       }
 
       desc.words_start = p_start;
       desc.words_end = p_end;
       desc.words_styles = span_style;
-      desc.words_xpos = cur_xpos;
+
       line_breaks.push_back(desc);
 
       // move the cursor to the end of the word
       p_start = p_end;
-      cur_xpos = 0;
     }while(p_end != p_span_end);
     
   }
@@ -112,17 +169,46 @@ void TextBlock::layout(Renderer *renderer, Epub *epub, int max_width)
 }
 void TextBlock::render(Renderer *renderer, int line_break_index, int x_pos, int y_pos)
 {
-    words_desc_type *p_desc = &line_breaks[line_break_index];
-    char backup_char = *p_desc->words_end;
-    
-    *((char *)p_desc->words_end) = '\0'; //Change the end character to '\0'
-
-       // get the style
+    line_desc_type *p_desc = &line_breaks[line_break_index];
+    char backup_char;
+    // get the style
     uint8_t style = p_desc->words_styles;
-    // render the word
-    renderer->draw_text(x_pos + p_desc->words_xpos, y_pos, p_desc->words_start, style & BOLD_SPAN, style & ITALIC_SPAN);
+    
+    if(p_desc->spare_width > 0)
+    {
+        //Calculate the words space_width
+        int words_count = 0;
+        const char *p = p_desc->words_start;
+        while (p < p_desc->words_end)
+        {
+          p = skip_word(p, p_desc->words_end);
+          words_count++;
+        }
+        float space_width = (float)p_desc->spare_width / (float)(words_count - 1);
 
-    *((char *)p_desc->words_end) = backup_char; //Restore the end character
+        // render the words with justified spacing
+        x_pos += p_desc->words_xpos;
+        p = p_desc->words_start;
+        while (p < p_desc->words_end)
+        {
+          int offset = 0;
+          char *p_end = (char *)skip_word(p, p_desc->words_end);
+          backup_char = *p_end;
+          *p_end = '\0'; //Change the end character to '\0'
+          offset = renderer->draw_text2(x_pos, y_pos, p, style & BOLD_SPAN, style & ITALIC_SPAN);
+          *p_end = backup_char; //Restore
+          p = p_end;
+          x_pos += offset + space_width; //Add the space width to the next word
+        }
+    }
+    else
+    {
+      backup_char = *p_desc->words_end;
+      *((char *)p_desc->words_end) = '\0'; //Change the end character to '\0'
+      // render the word
+      renderer->draw_text(x_pos + p_desc->words_xpos, y_pos, p_desc->words_start, style & BOLD_SPAN, style & ITALIC_SPAN);
+      *((char *)p_desc->words_end) = backup_char; //Restore the end character
+    }
 }
 // debug helper - dumps out the contents of the block with line breaks
 void TextBlock::dump()

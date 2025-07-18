@@ -28,6 +28,7 @@ public:
   virtual int get_text_width(const char *text, bool bold = false, bool italic = false) = 0;
   virtual int get_fixed_width_words(const char *text, const char **end_text, int line_width, bool bold = false, bool italic = false) = 0;
   virtual void draw_text(int x, int y, const char *text, bool bold = false, bool italic = false) = 0;
+  virtual int draw_text2(int x, int y, const char *text, bool bold = false, bool italic = false) = 0;
   virtual void draw_text_box(const std::string &text, int x, int y, int width, int height, bool bold = false, bool italic = false);
   virtual void draw_rect(int x, int y, int width, int height, uint8_t color = 0) = 0;
   virtual void draw_triangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t color) = 0;

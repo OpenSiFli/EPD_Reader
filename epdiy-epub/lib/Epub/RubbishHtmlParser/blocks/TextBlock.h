@@ -23,8 +23,9 @@ typedef struct
    const char *words_start;
    const char *words_end;
    uint16_t words_xpos;
+   uint16_t spare_width;
    uint8_t words_styles;
-}words_desc_type;
+}line_desc_type;
 
 
 
@@ -43,7 +44,7 @@ private:
 
 public:
   // where do we want to break the words into lines
-  std::vector<words_desc_type> line_breaks;
+  std::vector<line_desc_type> line_breaks;
 
   void add_span(const char *span, bool is_bold, bool is_italic);
   TextBlock(BLOCK_STYLE style) : style(style)
