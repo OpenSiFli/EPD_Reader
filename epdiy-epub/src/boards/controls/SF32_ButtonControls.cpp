@@ -7,19 +7,28 @@ static ActionCallback_t action_cbk ;
 
 void button_event_handler(int32_t pin, button_action_t action)
 {
-   
-  if (pin == EPD_KEY2)
+#ifdef BSP_USING_BOARD_SF32_OED_EPD_V11
+  if (pin == EPD_KEY1)
   {
       if (action == BUTTON_CLICKED)
       {
-          action_cbk(UIAction::SELECT); 
+          action_cbk(UIAction::UP); 
       }
   }
-  else if (pin == EPD_KEY1)
+#else
+  if (pin == EPD_KEY1)
   {
       if (action == BUTTON_CLICKED)
       {
           action_cbk(UIAction::DOWN); 
+      }
+  }
+
+  else if (pin == EPD_KEY2)
+  {
+      if (action == BUTTON_CLICKED)
+      {
+          action_cbk(UIAction::SELECT); 
       }
   }
   else if (pin == EPD_KEY3)
@@ -29,8 +38,30 @@ void button_event_handler(int32_t pin, button_action_t action)
           action_cbk(UIAction::UP); 
       }
   }
+#endif
 }
 
+#ifdef EPD_KEY_GPADC
+static void dummy_button_event_handler(int32_t pin, button_action_t action)
+{
+    // This function is a placeholder for buttons that do not require action handling.
+    // It can be used to prevent assertion errors if no action is needed.
+}
+
+
+#ifdef USING_ADC_BUTTON
+static void adc_button_handler(uint8_t group_idx, int32_t pin, button_action_t button_action)
+{
+    rt_kprintf("adc_button_handler:%d,%d,%d\n", group_idx, pin, button_action);
+      if (button_action == BUTTON_CLICKED)
+      {
+        if (0 == pin)        action_cbk(UIAction::SELECT);
+        else if (1 == pin)   action_cbk(UIAction::DOWN);
+      }
+}
+
+#endif /* USING_ADC_BUTTON */
+#endif /* EPD_KEY_GPADC */
 
 SF32_ButtonControls::SF32_ButtonControls(
     ActionCallback_t on_action)
@@ -50,6 +81,7 @@ SF32_ButtonControls::SF32_ButtonControls(
       RT_ASSERT(0);
   }
  
+#ifndef BSP_USING_BOARD_SF32_OED_EPD_V11
   cfg.pin = EPD_KEY2;
   cfg.active_state = BUTTON_ACTIVE_HIGH;
   cfg.mode = PIN_MODE_INPUT;
@@ -60,7 +92,6 @@ SF32_ButtonControls::SF32_ButtonControls(
   {
       RT_ASSERT(0);
   }
-
   cfg.pin = EPD_KEY3;
   cfg.active_state = BUTTON_ACTIVE_HIGH;
   cfg.mode = PIN_MODE_INPUT;
@@ -71,6 +102,24 @@ SF32_ButtonControls::SF32_ButtonControls(
   {
       RT_ASSERT(0);
   }
+#endif /*!BSP_USING_BOARD_SF32_OED_EPD_V11*/
+#ifdef EPD_KEY_GPADC
+  cfg.pin = EPD_KEY_GPADC;
+  cfg.active_state = BUTTON_ACTIVE_HIGH;
+  cfg.mode = PIN_MODE_INPUT;
+  cfg.button_handler = dummy_button_event_handler;
+  id = button_init(&cfg);
+  RT_ASSERT(id >= 0);
+#ifdef USING_ADC_BUTTON
+    adc_button_handler_t handler[2] = {adc_button_handler, adc_button_handler};
+    rt_err_t err = button_bind_adc_button(id, 0, sizeof(handler)/sizeof(handler[0]), &handler[0]);
+    RT_ASSERT(0 == err);
+#endif
+  if (SF_EOK != button_enable(id))
+  {
+      RT_ASSERT(0);
+  }
+#endif
 
   action_cbk = on_action;
 }

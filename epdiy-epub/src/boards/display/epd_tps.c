@@ -148,6 +148,8 @@ void oedtps_init(uint16_t vcom_voltage)
     oedtps_power_sequence_set();
     oedtps_vposvneg_set();
     oedtps_vcom_set(vcom_voltage);           //VCOM设置
+
+    rt_kprintf("oedtps_init: vcom=%dmV, \n",vcom_voltage);
 }
 
 void oedtps_vcom_enable(void)

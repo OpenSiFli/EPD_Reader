@@ -9,7 +9,7 @@ if not SIFLI_SDK:
 from building import *
 
 # Prepare environment.
-PrepareEnv()
+PrepareEnv(board_search_path="..")
 
 ################################## change rtconfig.xxx to customize build ########################################
 
