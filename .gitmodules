@@ -1,3 +1,3 @@
 [submodule "SiFli-SDK"]
 	path = SiFli-SDK
-	url = ssh://10.21.10.179:29418/SiFli-SDK
+	url = ../SiFli-SDK
