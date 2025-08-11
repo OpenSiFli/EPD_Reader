@@ -84,50 +84,46 @@ epdiy-epub
 1、复制`src\board\display\epd_configs_yzc085.c`以新的屏幕名称命名这个文件<br>
 2、根据屏幕波形文档，将波形数据转成一个数组例如全刷波形数组`static const uint8_t yzc085_wave_forms_full[32][256] = {}`和局刷波形数组`static const uint8_t yzc085_wave_forms_partial[12][256] = {}`<br>
 3、对应屏驱文档，修改下列函数
-
-* 1、如果波形只支持一个温度，只需要根据刷新次数决定本次刷新使用全刷还是局部刷，并返回本次刷新需要的波形帧数，同时设置当前要用的波形表指针。根据波形表进行重新设计刷新方式。
+* 1、如果波形多个温度，可通过波形表生成不同温度的多个二维波形数组，可参考如下代码,通过温度控制不同刷新不同的数据
 ```c
-
+// 定义波形表条目结构体
+typedef struct {
+    int min_temp;           
+    int max_temp;          
+    uint32_t frame_count; 
+    const uint8_t (*wave_table)[256];  
+} WaveTableEntry;
+// 原始波形数据
+static const uint8_t te067xjhe_wave_full_0_5[45][256] = {};
+static const uint8_t te067xjhe_wave_full_5_10[45][256] = {};
+//...
+static const uint8_t te067xjhe_wave_full_50_100[45][256] = {};
+// 全刷波形表 - 按温度区间组织
+static const WaveTableEntry te067xjhe_wave_forms_full[] = {
+    {0,   5,  45, &te067xjhe_wave_full_0_5[0]},
+    {5,  10,  45, &te067xjhe_wave_full_5_10[0]},
+    //...
+    {50, 100, 45, &te067xjhe_wave_full_50_plus[0]},  // The range above 50 degrees
+};
+static const uint8_t *p_current_wave_from = NULL;
 uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
 {
-    uint32_t total_frames = 0;
+    const WaveTableEntry *wave_table;
+    size_t table_size;
+    
+    wave_table = te067xjhe_wave_forms_full;
+    table_size = sizeof(te067xjhe_wave_forms_full) / sizeof(WaveTableEntry);
 
-    if (reflesh_times % PART_DISP_TIMES == 0)
-    {
-        total_frames = sizeof(yzc085_wave_forms_full)/sizeof(yzc085_wave_forms_full[0]); //Full refresh
-        p_current_wave_from = &yzc085_wave_forms_full[0][0];
-    }
-    else
-    {
-        total_frames = sizeof(yzc085_wave_forms_partial)/sizeof(yzc085_wave_forms_partial[0]); //Partial refresh
-        p_current_wave_from = &yzc085_wave_forms_partial[0][0];
-    }
-    reflesh_times++;
-
-    return total_frames;
-}
-```
-* 如果波形支持多个温度，可通过波形表生成不同温度的多个二维波形数组，可参考如下代码,通过温度控制不同刷新不同的数据
-```c
-static const uint8_t (* te067xjhe_wave_forms_full[11]) [45] [256]  = 
-    {&tmp1,&tmp2,&tmp3,&tmp4,&tmp5,&tmp6,&tmp7,&tmp8,&tmp9,&tmp10,&tmp11};//在生成波形数组的时候就把温度分成多份二维数组，存储不同温度下的波形数据
-
-uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
-{
-    uint32_t total_frames = 0;
-    int32_t temp_index;
-    for (int i = 0; i <= 10; i++)//通过判断不同的温度进入不同的波形刷新数据
-    {
-        if (temperature <= 5 * (i +1))
-        {
-            temp_index = i;
-            break;
+    // Find the interval corresponding to the temperature
+    for (size_t i = 0; i < table_size; i++) {
+        if (temperature >= wave_table[i].min_temp && temperature < wave_table[i].max_temp) {
+            p_current_wave_from = (const uint8_t *)(*wave_table[i].wave_table);
+            return wave_table[i].frame_count;
         }
     }
-    total_frames = sizeof(tmp1) / sizeof(tmp1[0]);
-    p_current_wave_from = (const uint8_t *) (* te067xjhe_wave_forms_full[temp_index]); //Partial refresh
 
-    return total_frames;
+    p_current_wave_from = (const uint8_t *)(*wave_table[0].wave_table);
+    return wave_table[0].frame_count;
 }
 
 ```
