@@ -8,29 +8,30 @@
 
 ## 使用指南
 ### 硬件连接
-硬件连接主要是开发板与屏幕的连接，找到相应的卡扣，扣紧（注意查看引脚顺序）就可以连接成功。
-<!--（放个链接）-->
-### 程序烧录
+硬件连接主要是开发板(`SF32-OED-6'-EPD_V1.1`)与屏幕的连接，找到相应的卡扣，扣紧（注意查看引脚顺序）就可以连接成功。
+
+#### 程序编译与烧录
+切换到例程project目录，运行scons命令执行编译：
+```
+scons --board=sf32-oed-epd_v11 --board_search_path=.. -j8 
+```
+运行`build_sf32-oed-epd_hcpu\uart_download.bat`，按提示选择端口即可进行下载：
+```
+build_sf32l-oed-epd_v11_hcpu\uart_download.bat
+Uart Download
+please input the serial port num: 5  (填写相应的端口号)
+```
 这里只做简单讲解，详细请查看[编译烧录链接](https://docs.sifli.com/projects/sdk/latest/sf32lb52x/quickstart/build.html)
 #### menuconfig配置
 首先查看屏幕的型号，确定menuconfig配置相同型号（默认是`6.0 rect electronic paper display(EPD YZC052_V1.05 1032x758)`），然后再进行编译烧录，查看方式如下图
 切换到例程project目录，运行menuconfig命令执行编译：
 ```
-menuconfig --board=sf32-oed-epd
+menuconfig --board=sf32-oed-epd_v11 --board_search_path=..
 ```
 ![alt text](src/assets/menuconfig.png)
-#### 程序编译与烧录
-切换到例程project目录，运行scons命令执行编译：
-```
-scons --board=sf32-oed-epd -j8
-```
-运行`build_sf32-oed-epd_hcpu\uart_download.bat`，按提示选择端口即可进行下载：
-```
-build_sf32l-oed-epd_hcpu\uart_download.bat
-Uart Download
-please input the serial port num: 5  (填写相应的端口号)
-```
+
 ## 阅读指南
+### 按键指南
 1. 主界面阅读EPUB文件选择
   上下移动选择：按K3键上移光标，按K1键下移光标，浏览EPUB电子书目录列表。
 2. 进入/退出电子书的阅读界面
@@ -42,6 +43,12 @@ please input the serial port num: 5  (填写相应的端口号)
   K1键：用于基础功能向上移动、翻页；
   K2键：层级递进操作确认键；以及返回主界面；
   K3键：用于基础功能向上移动、翻页。
+
+### 触控指南
+* 在屏幕左上角有三个按钮可以实现触摸控制，本质的功能和按键实现功能相同。
+1. 向上的箭头`▲`: 向上移动或者向上翻页。
+2. 向下的箭头`▼`: 向下移动或者向下翻页。
+3. 圆圈`●`: 确认或者返回键。
 
 ## 软件框架
 主要的程序框架讲解，具体内容可阅读[开源EPUB阅读器](https://github.com/atomic14/diy-esp32-epub-reader)
@@ -61,7 +68,11 @@ epdiy-epub
 │   ├──miniz-2.2.0                  # 轻量级 ZIP 解压库，处理 EPUB 压缩包
 │   ├──png                          # PNG 图像解码库，为 PNGHelper 提供底层解码能力。
 │   └──tjpgd3                       # JPEG 图像解码库，为 JPEGHelper 提供底层解码能力。
+|
 ├──project                          # 编译脚本为项目编译、调试、部署提供工具链支持
+|
+├──sf32-oed-epd_v11                 # sf32-oed-epd_v11开发板相关配置文件
+|
 ├──src                              # 项目核心源码目录，实现阅读器业务逻辑
 │   ├──boards                       # 硬件板级<br>
 │   │    ├──battery                 # 电池管理模块，包含电量检测
@@ -78,7 +89,7 @@ epdiy-epub
 * 增加大量EPUB电子书文件，主要通过读取TF卡内容，实现大量文件读取功能
 
 ### 更换屏幕
-* 已有的两个屏幕型号分别是`6.0 rect electronic paper display(EPD R7D005_-1.30 1448x1072)`、`6.0 rect electronic paper display(EPD YZC052_V1.05 1032x758)`
+* 已有的三个屏幕型号分别是`6.0 rect electronic paper display(EPD R7D005_-1.30 1448x1072)`、`6.0 rect electronic paper display(EPD YZC052_V1.05 1032x758)`、`6.7 rect electronic paper display(TiamMa TE067XJHE01 V1.0  1920x960)`
 可以通过menuconfig配置选择不同的屏幕<br>
 #### 添加新的屏幕屏驱  
 1、复制`src\board\display\epd_configs_yzc085.c`以新的屏幕名称命名这个文件<br>
@@ -161,24 +172,17 @@ const EPD_TimingConfig *epd_get_timing_config(void)
     return &timing_config;
 }
 ```
+
 * 4、提供电子书显示所需的参考电压，确保显示效果稳定。新屏幕的VCOM电压可能不同，需要查阅新屏幕规格书，修改返回值。
 ```c
 uint16_t epd_get_vcom_voltage(void)
 {
     return 2100;
 }
-4、在Kconfig文件中增加驱动IC的宏定义
-打开`epd_reader\epdiy-epub\project\Kconfig.proj`文件里面有很多类似LCD_USING_XXX的config，在后面添加新的config：
-```c
-config LCD_USING_YZC085_V100
-    bool
-    default n
 ```
 
-5、为新的屏幕模组添加menuconfig选项，
-打开`epd_reader\epdiy-epub\project\Kconfig.proj`文件，添加新的配置可以参考[添加menuconfig选项](https://wiki.sifli.com/tools/%E5%B1%8F%E5%B9%95%E8%B0%83%E8%AF%95/%E6%B7%BB%E5%8A%A0%E5%B1%8F%E5%B9%95%E6%A8%A1%E7%BB%84menuconfig%E9%80%89%E9%A1%B9.html)具体内容可参考当前驱动内容进行修改。  
-6、如果屏幕没有任何显示，就需要查看屏幕的时序是否和当前驱动中的时序相同，当前的时序在`epd_reader\epdiy-epub\src\boards\display\epd_display.c`中，主要查看`static void LCD_WriteMultiplePixels()`函数的时序部分就行修改。
-
+4、在Kconfig文件中增加驱动IC的宏定义以及为新的屏幕模组添加menuconfig选项，
+打开`epd_reader\epdiy-epub\project\Kconfig.proj`文件，添加新的配置可以参考[添加IC宏和menuconfig选项](https://wiki.sifli.com/tools/%E5%B1%8F%E5%B9%95%E8%B0%83%E8%AF%95/%E6%B7%BB%E5%8A%A0%E5%B1%8F%E5%B9%95%E6%A8%A1%E7%BB%84%EF%BC%883%20%E5%A4%96%E7%BD%AE%EF%BC%89.html)具体内容可参考当前驱动内容进行修改。  
 
 ### 修改字体流程
 先生成指定的unicode码范围数组，然后用这个数组去指定的ttf里面生成字库
