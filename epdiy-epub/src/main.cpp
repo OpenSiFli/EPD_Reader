@@ -196,6 +196,39 @@ void draw_battery_level(Renderer *renderer, float voltage, float percentage)
   // put the margin back
   renderer->set_margin_top(35);
 }
+void draw_lightning(Renderer *renderer, int x, int y, int size) {
+    const float tilt_factor = 0.3f;
+    int tri1_A_x = x + 1;
+    int tri1_A_y = y + 1;
+    int tri1_B_x = tri1_A_x - size/4;
+    int tri1_B_y = tri1_A_y + (int)(size/4 * tilt_factor);
+    int tri1_C_x = tri1_A_x + (int)(size/2 * tilt_factor); 
+    int tri1_C_y = tri1_A_y - size/2;
+    renderer->fill_triangle(tri1_A_x, tri1_A_y, tri1_B_x, tri1_B_y, tri1_C_x, tri1_C_y, 0);
+
+    int tri2_D_x = x;
+    int tri2_D_y = y;
+    int tri2_E_x = tri2_D_x + size/4;
+    int tri2_E_y = tri2_D_y - (int)(size/4 * tilt_factor);
+    int tri2_F_x = tri2_D_x - (int)(size/2 * tilt_factor);
+    int tri2_F_y = tri2_D_y + size/2;
+    renderer->fill_triangle(tri2_D_x, tri2_D_y, tri2_E_x, tri2_E_y, tri2_F_x, tri2_F_y, 0);
+}
+
+void draw_charge_status(Renderer *renderer, Battery *battery)
+{
+    const int icon_size = 30;
+    int battery_width = 40;
+    int margin_right = 0;
+    int margin_top = 3;
+    int xpos = renderer->get_page_width() - battery_width - margin_right - icon_size - 4;
+    int ypos = margin_top;
+    
+    if (battery->is_charging()) {
+        draw_lightning(renderer, xpos + icon_size/2, ypos + icon_size/2, icon_size);
+    } 
+}
+
 
 void main_task(void *param)
 {
@@ -252,6 +285,7 @@ void main_task(void *param)
   // draw the battery level before flushing the screen
   if (battery)
   {
+    draw_charge_status(renderer, battery);
     draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
   }
   touch_controls->render(renderer);
@@ -282,6 +316,7 @@ void main_task(void *param)
     if (battery)
     {
       ulog_i("main", "Battery Level %f, percent %d", battery->get_voltage(), battery->get_percentage());
+      draw_charge_status(renderer, battery);
       draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
     }
     renderer->flush_display();
