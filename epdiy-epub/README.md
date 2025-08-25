@@ -10,6 +10,9 @@
 ### 硬件连接
 硬件连接主要是开发板(`SF32-OED-6'-EPD_V1.1`)与屏幕的连接，找到相应的卡扣，扣紧（注意查看引脚顺序）就可以连接成功。
 
+### 编译环境要求
+目前epub电子书只验证过[SiFli-ENV 1.1.2](https://docs.sifli.com/projects/sdk/latest/sf32lb52x/quickstart/install/lacey_install.html)模式下使用armclang编译方式，并且Keil的版本要求是5.32。已知在Keil 5.42版本上会有C语法兼容问题， GCC模式下也有兼容问题和空间越界问题，待后续版本更新。
+
 #### 程序编译与烧录
 切换到例程project目录，运行scons命令执行编译：
 ```
