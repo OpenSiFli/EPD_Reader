@@ -14,6 +14,9 @@ config TOUCH_RESET_PIN
     int
     default 31
 
+    config CHG_STATUS
+    int
+    default    26
 
     config TPS_SDA
     int
