@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-
+#include <stdint.h>
 class ImageHelper;
 
 #define MAX_WORD_LENGTH 100

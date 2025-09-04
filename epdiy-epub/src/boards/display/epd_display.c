@@ -96,7 +96,7 @@ Define a mixed grey framebuffer on PSRAM
 high 4 bits for old pixel and low 4 bits for new pixel in every byte.
 */
 L2_NON_RET_BSS_SECT_BEGIN(frambuf)
-L2_NON_RET_BSS_SECT(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[LCD_HOR_RES_MAX * LCD_VER_RES_MAX];);
+L2_NON_RET_BSS_SECT(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[LCD_HOR_RES_MAX * LCD_VER_RES_MAX]);
 L2_NON_RET_BSS_SECT_END
 
 /**

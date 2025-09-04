@@ -107,7 +107,7 @@ const EpdGlyph* epd_get_glyph(const EpdFont *font, uint32_t code_point) {
     return NULL;
 }
 
-static int uncompress(uint8_t *dest, uint32_t uncompressed_size, const uint8_t *source, uint32_t source_size) {
+static int uncompress(uint8_t *dest, size_t  uncompressed_size, const uint8_t *source, size_t  source_size) {
     if (uncompressed_size == 0 || dest == NULL || source_size == 0 || source == NULL) {
         return -1;
     }
@@ -287,14 +287,15 @@ int epd_get_fixed_width_words(const EpdFont *font, const char *string,
     return 0;
   }
 
-  const char *last_word_end_text = string;
+    char *volatile temp_string =(char *)string;
+  const char *last_word_end_text = temp_string;
   int last_word_width = 0;
 
   int minx = 100000, miny = 100000, maxx = -1, maxy = -1;
   int temp_x = 0;
   int temp_y = 0;
   uint32_t c;
-  while ((c = next_cp((const uint8_t **)&string))) {
+  while ((c = next_cp((const uint8_t **)&temp_string))) {
     get_char_bounds(font, c, &temp_x, &temp_y, &minx, &miny, &maxx, &maxy, &props);
 
     if((maxx - minx) > fixed_width)
@@ -303,7 +304,7 @@ int epd_get_fixed_width_words(const EpdFont *font, const char *string,
     }
     if(is_delimiter(c)) //Record last delimiter pointer and width
     {
-       last_word_end_text = string;
+       last_word_end_text = temp_string;
        last_word_width = maxx - minx;
     }
   }
@@ -317,13 +318,13 @@ int epd_get_fixed_width_words(const EpdFont *font, const char *string,
     }
     else
     {
-       *end_text = string;
+       *end_text = temp_string;
        return fixed_width;
     }
   }
   else //Reached the end
   {
-      *end_text = string;
+      *end_text = temp_string;
       return maxx - minx;
   }
 }
