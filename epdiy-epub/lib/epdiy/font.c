@@ -420,7 +420,7 @@ enum EpdDrawError epd_write_string(
     ulog_e("font.c", "cannot draw a NULL string!");
     return EPD_DRAW_STRING_INVALID;
   }
-  tofree = newstring = strdup(string);
+  tofree = newstring = rt_strdup(string);
   if (newstring == NULL) {
     ulog_e("font.c", "cannot allocate string copy!");
     return EPD_DRAW_FAILED_ALLOC;
@@ -435,6 +435,6 @@ enum EpdDrawError epd_write_string(
     *cursor_y += font->advance_y;
   }
 
-  free(tofree);
+  rt_free(tofree);
   return err;
 }
