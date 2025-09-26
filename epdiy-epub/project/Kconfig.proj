@@ -17,7 +17,6 @@ choice EPD_EPUB_COLOR_DEPTH
 		bool "EPDIY_EPUB_4BPP"    
 endchoice
 
-
 if !BSP_USING_BUILT_LCD
 	config LCD_USING_R7D005_130
 		bool
@@ -31,22 +30,32 @@ if !BSP_USING_BUILT_LCD
 	    bool 
 		default n
 
+	config TSC_USING_FT5446U_V01
+		bool
+		default n
+
     choice
         prompt "Custom LCD driver"
         default LCD_USING_EPD_YZC085_V100
 		
 		config LCD_USING_EPD_R7D005
 			bool "6.0 rect electronic paper display(EPD R7D005_-1.30 1448x1072)"
-			select TSC_USING_FT5446U if BSP_USING_TOUCHD
+			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
 			select LCD_USING_R7D005_130
 			select BSP_LCDC_USING_EPD_8BIT
 
 		config LCD_USING_EPD_YZC085_V100
 			bool "6.0 rect electronic paper display(EPD YZC052_V1.05 1032x758)"
-			select TSC_USING_FT5446U if BSP_USING_TOUCHD
+			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
 			select LCD_USING_YZC085_V100
 			select BSP_LCDC_USING_EPD_8BIT
-			
+		
+		config LCD_USING_EPD_YZC146_V100
+			bool "6.0 rect electronic paper display(EPD YZC146_1.00 1032x758)"
+			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
+			select LCD_USING_YZC085_V100
+			select BSP_LCDC_USING_EPD_8BIT
+
 		config LCD_USING_EPD_TE067XJHE01_V10
 			bool "6.7 rect electronic paper display(TiamMa TE067XJHE01 V1.0  1920x960)"
 			select LCD_USING_TE067XJHE01_V10
@@ -58,17 +67,17 @@ if !BSP_USING_BUILT_LCD
         default 1448 if LCD_USING_EPD_R7D005
 		default 1032 if LCD_USING_EPD_YZC085_V100
 		default 1920 if LCD_USING_EPD_TE067XJHE01_V10
-
+		default 1032 if LCD_USING_EPD_YZC146_V100
     config LCD_VER_RES_MAX
         int
         default 1072 if LCD_USING_EPD_R7D005
 		default 758  if LCD_USING_EPD_YZC085_V100
 		default 960  if LCD_USING_EPD_TE067XJHE01_V10
-
+		default 758  if LCD_USING_EPD_YZC146_V100
     config LCD_DPI
         int
         default 315 if LCD_USING_EPD_R7D005
 		default 300 if LCD_USING_EPD_YZC085_V100
 		default 320 if LCD_USING_EPD_TE067XJHE01_V10
-
+		default 300 if LCD_USING_EPD_YZC146_V100
 endif
