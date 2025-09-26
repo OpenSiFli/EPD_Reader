@@ -2,7 +2,7 @@
 #include "epd_configs.h"
 #include "mem_section.h"
 #include "string.h"
-#ifdef LCD_USING_EPD_YZC085_V100
+#if defined(LCD_USING_EPD_YZC085_V100) || defined(LCD_USING_EPD_YZC146_V100)
 #define PART_DISP_TIMES       10        // After PART_DISP_TIMES-1 partial refreshes, perform a full refresh once
 static int reflesh_times = 0;
 
@@ -114,7 +114,7 @@ void epd_wave_table_fill_lut(uint32_t *p_epic_lut, uint32_t frame_num)
 
 uint16_t epd_get_vcom_voltage(void)
 {
-#ifdef LCD_USING_EPD_YZC085_V100
+#if defined(LCD_USING_EPD_YZC085_V100) || defined(LCD_USING_EPD_YZC146_V100)
     return 1050;
 #else
     return 2100;
@@ -142,4 +142,4 @@ const EPD_TimingConfig *epd_get_timing_config(void)
     return &timing_config;
 }
 
-#endif /*LCD_USING_EPD_YZC085_V100*/
+#endif /*LCD_USING_EPD_YZC085_V100 || LCD_USING_EPD_YZC146_V100*/
