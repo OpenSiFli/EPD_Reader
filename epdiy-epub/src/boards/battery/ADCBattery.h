@@ -3,6 +3,7 @@
 extern "C" {
 #include "rtdevice.h"
 #include "board.h"
+#include "bsp_io_expansion.h"
 }
 
 class ADCBattery : public Battery
@@ -54,7 +55,7 @@ public:
   
   virtual bool is_charging() override
   {
-      int pin_val = rt_pin_read(CHG_STATUS);
+      int pin_val = AW9523B_Read_Pin(P0_1_CHG_STATUS);
       return pin_val == 0;
   }
 };

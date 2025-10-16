@@ -14,6 +14,7 @@ private:
   uint8_t ui_button_width = 120;
   uint8_t ui_button_height = 34;
   UIAction last_action = NONE;
+  UIAction press_action = NONE;  
   
   
   public:

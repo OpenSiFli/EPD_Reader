@@ -18,46 +18,60 @@ rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
     //Rotate anti-clockwise 90 degree
     x = LCD_VER_RES_MAX - touch_data.y - 1;
     y = touch_data.x;
-    
-
     if (TOUCH_EVENT_DOWN == touch_data.event)
+    {
         rt_kprintf("Touch down [%d,%d]\r\n", x, y);
-    else
+
+        UIAction press_action = NONE;
+        
+        if (x >= 10 && x <= 10 + instance->ui_button_width && y < 200)
+        {
+            press_action = DOWN;
+            instance->renderPressedState(instance->renderer, DOWN, true); 
+        }
+        else if (x >= 150 && x <= 150 + instance->ui_button_width && y < 200)
+        {
+            press_action = UP;
+            instance->renderPressedState(instance->renderer, UP, true);
+        }
+        else if (x >= 300 && x <= 300 + instance->ui_button_width && y < 200)
+        {
+            press_action = SELECT;
+            instance->renderPressedState(instance->renderer, SELECT, true);
+        }
+        
+        instance->press_action = press_action;
+    }
+    else if (TOUCH_EVENT_UP == touch_data.event)
+    {
         rt_kprintf("Touch up   [%d,%d]\r\n", x, y);
-
-
-
-  UIAction action = NONE;
-  // LOG_I("TOUCH", "Received touch event %d,%d", x, y);
-  if (x >= 10 && x <= 10 + instance->ui_button_width && y < 200)
-  {
-    action = DOWN;
-    instance->renderPressedState(instance->renderer, UP, false);
-  }
-  else if (x >= 150 && x <= 150 + instance->ui_button_width && y < 200)
-  {
-    action = UP;
-    instance->renderPressedState(instance->renderer, DOWN, false);
-  }
-  else if (x >= 300 && x <= 300 + instance->ui_button_width && y < 200)
-  {
-    action = SELECT;
-  }
-  else
-  {
-
-  }
-  instance->last_action = action;
-  if (action != NONE)
-  {
-    instance->on_action(action);
-  }
+        UIAction release_action = NONE;
+        
+        if (x >= 10 && x <= 10 + instance->ui_button_width && y < 200)
+            release_action = DOWN;
+        else if (x >= 150 && x <= 150 + instance->ui_button_width && y < 200)
+            release_action = UP;
+        else if (x >= 300 && x <= 300 + instance->ui_button_width && y < 200)
+            release_action = SELECT;
+        
+        if (instance->press_action != NONE && instance->press_action == release_action)
+        {
+            instance->last_action = release_action;
+            instance->on_action(release_action);
+        }
+        
+        if (instance->press_action != NONE)
+        {
+            instance->renderPressedState(instance->renderer, instance->press_action, false);
+            instance->press_action = NONE;
+        }
+    }
     
     return RT_EOK;
 }
 
 SF32_TouchControls::SF32_TouchControls(Renderer *renderer, ActionCallback_t on_action)
-  : on_action(on_action), renderer(renderer)
+  : on_action(on_action), renderer(renderer), press_action(NONE)  
 {
     tp_device = rt_device_find("touch");
 

@@ -114,7 +114,7 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
     HAL_LCDC_Init(hlcdc);
 
     //Initialize power supply chip
-    oedtps_init(epd_get_vcom_voltage());
+    fp9931_init(epd_get_vcom_voltage());
 
 
     hlcdc->Instance->LAYER0_CONFIG = (4   << LCD_IF_LAYER0_CONFIG_FORMAT_Pos) |       //RGB332
@@ -133,8 +133,7 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
 
     hlcdc->Instance->LCD_WR = 0;
 
-    oedtps_vcom_disable();
-    oedtps_source_gate_disable();
+    fp9931_disable();
 
     epd_wave_table();
 
@@ -543,10 +542,8 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
 
 
     uint32_t start_tick = rt_tick_get();
-    oedtps_source_gate_enable();
+    fp9931_enable();
     LCD_DRIVER_DELAY_MS(50);
-    oedtps_vcom_enable();
-    LCD_DRIVER_DELAY_MS(10);
 
     LOG_I("LCD_WriteMultiplePixels ColorMode=%d", hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format);
 
@@ -655,9 +652,7 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
     EPD_CPV_L_hs();
 
     LCD_DRIVER_DELAY_MS(10);
-    oedtps_vcom_disable();
-    LCD_DRIVER_DELAY_MS(10);
-    oedtps_source_gate_disable();
+    fp9931_disable();
     LOG_I("Total %d frames, take time=%dms wait_lcd=%d(us), lut_copy=%d(us)\r\n", frame_times,
           rt_tick_get() - start_tick, wait_lcd_ticks / 240,
           lut_copy_ticks / 240);
