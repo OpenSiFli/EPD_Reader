@@ -9,5 +9,5 @@ void oedtps_vcom_enable(void);
 void oedtps_vcom_disable(void);
 void oedtps_source_gate_enable(void);
 void oedtps_source_gate_disable(void);
-
+rt_err_t tps_enter_sleep(void);
 #endif /*__EPD_TPS_H__*/

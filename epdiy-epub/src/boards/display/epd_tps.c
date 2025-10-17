@@ -172,3 +172,15 @@ void oedtps_source_gate_disable(void)
 {
     TPS_PWRUP_L_hs();
 }
+rt_err_t tps_enter_sleep(void)
+{
+    oedtps_vcom_disable(); 
+
+    HAL_Delay(10);
+    oedtps_source_gate_disable();
+
+    HAL_Delay(100);
+    TPS_WAKEUP_L_hs();
+
+     return RT_EOK;
+}

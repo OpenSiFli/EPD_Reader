@@ -158,6 +158,7 @@ static uint32_t LCD_ReadID(LCDC_HandleTypeDef *hlcdc)
 static void LCD_DisplayOn(LCDC_HandleTypeDef *hlcdc)
 {
     /* Display On */
+
 }
 
 /**
@@ -168,6 +169,7 @@ static void LCD_DisplayOn(LCDC_HandleTypeDef *hlcdc)
 static void LCD_DisplayOff(LCDC_HandleTypeDef *hlcdc)
 {
     /* Display Off */
+    tps_enter_sleep();
 }
 
 static void LCD_SetRegion(LCDC_HandleTypeDef *hlcdc, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1)

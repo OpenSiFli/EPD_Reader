@@ -21,5 +21,7 @@ private:
   SF32_TouchControls(Renderer *renderer, ActionCallback_t on_action);
   void render(Renderer *renderer);
   void renderPressedState(Renderer *renderer, UIAction action, bool state = true);
+  void powerOffTouch();
+  void powerOnTouch();
 
 };

@@ -5,7 +5,14 @@
 #include "EpubList/EpubToc.h"
 #include <RubbishHtmlParser/RubbishHtmlParser.h>
 #include "boards/Board.h"
-
+#include "boards/controls/SF32_TouchControls.h"
+#include "boards/SF32PaperRenderer.h"
+#include "gui_app_pm.h"
+#include "epd_tps.h"
+#include "epd_pin_defs.h"
+#include "drv_gpio.h"
+#include "bf0_pm.h"
+#include "epd_driver.h"
 #undef LOG_TAG
 #undef DBG_LEVEL
 #define  DBG_LEVEL            DBG_LOG //DBG_INFO  //
@@ -45,6 +52,52 @@ static EpubList *epub_list = nullptr;
 static EpubReader *reader = nullptr;
 static EpubToc *contents = nullptr;
 
+
+uint8_t touch_enable = 0;
+// 声明全局变量，以便open_tp_lcd和close_tp_lcd函数可以访问
+Renderer *renderer = nullptr;
+TouchControls *touch_controls = nullptr;
+
+//extern rt_err_t tps_enter_sleep(void);
+static uint8_t open_state = 1;
+
+void close_tp_lcd()
+{ 
+  
+  if(open_state)
+  {
+    SF32PaperRenderer *sf32_renderer = static_cast<SF32PaperRenderer*>(renderer);
+    sf32_renderer->powerOffLcd();
+    open_state = 0;
+  }
+  if(!touch_enable)
+  {
+    // 需要进行类型转换，因为touch_controls是基类指针
+    SF32_TouchControls *sf32_touch_controls = static_cast<SF32_TouchControls*>(touch_controls);
+    sf32_touch_controls->powerOffTouch();
+    
+  }
+  rt_pm_release(PM_SLEEP_MODE_IDLE); 
+}
+
+void open_tp_lcd()
+{ 
+  rt_pm_request(PM_SLEEP_MODE_IDLE);
+  if(!open_state)
+  {
+    SF32PaperRenderer *sf32_renderer = static_cast<SF32PaperRenderer*>(renderer);
+    sf32_renderer->powerOnLcd();
+    open_state = 1;
+  }
+
+  if(touch_enable)
+  {
+    // 需要进行类型转换，因为touch_controls是基类指针
+    SF32_TouchControls *sf32_touch_controls = static_cast<SF32_TouchControls*>(touch_controls);
+    sf32_touch_controls->powerOnTouch();
+  }
+  rt_pm_release(PM_SLEEP_MODE_IDLE); 
+}
 void handleEpub(Renderer *renderer, UIAction action)
 {
   if (!reader)
@@ -141,15 +194,29 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
     epub_list->next();
     break;
   case SELECT:
-    // switch to reading the epub
-    // setup the reader state
-    ui_state = SELECTING_TABLE_CONTENTS;
-    // create the reader and load the book
-    contents = new EpubToc(epub_list_state.epub_list[epub_list_state.selected_item], epub_index_state, renderer);
-    contents->load();
-    contents->set_needs_redraw();
-    handleEpubTableContents(renderer, NONE, true);
-    return;
+    // 检查是否选中了底部特殊区域
+    if (epub_list_state.selected_item == -1) {
+      // 打印"1"
+      rt_kprintf("1\n");
+      touch_enable = !touch_enable;  
+
+      // 刷新屏幕以更新底部区域的文本显示
+      epub_list->render();
+
+      return;
+    } 
+    else 
+    {
+      // switch to reading the epub
+      // setup the reader state
+      ui_state = SELECTING_TABLE_CONTENTS;
+      // create the reader and load the book
+      contents = new EpubToc(epub_list_state.epub_list[epub_list_state.selected_item], epub_index_state, renderer);
+      contents->load();
+      contents->set_needs_redraw();
+      handleEpubTableContents(renderer, NONE, true);
+      return;
+    }
   case NONE:
   default:
     // nothing to do
@@ -157,26 +224,6 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
   }
   epub_list->render();
 }
-
-void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_redraw)
-{
-  uint32_t start_tick = rt_tick_get();
-  switch (ui_state)
-  {
-  case READING_EPUB:
-    handleEpub(renderer, ui_action);
-    break;
-  case SELECTING_TABLE_CONTENTS:
-    handleEpubTableContents(renderer, ui_action, needs_redraw);
-    break;
-  case SELECTING_EPUB:
-  default:
-    handleEpubList(renderer, ui_action, needs_redraw);
-    break;
-  }
-  rt_kprintf("Renderer time=%d \r\n", rt_tick_get() - start_tick);
-}
-
 // TODO - add the battery level
 void draw_battery_level(Renderer *renderer, float voltage, float percentage)
 {
@@ -229,6 +276,74 @@ void draw_charge_status(Renderer *renderer, Battery *battery)
     } 
 }
 
+void draw_welcome_page(Battery *battery)
+{
+  open_tp_lcd();
+  
+  // 清除渲染器内部缓冲区
+  renderer->clear_screen();
+  
+  // 设置白色背景
+  renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 255);
+  if (battery) {
+    renderer->set_margin_top(35);
+    draw_charge_status(renderer, battery);
+    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
+  }
+
+  const char *welcome_text = "欢                 迎";
+  int text_width = renderer->get_text_width(welcome_text);
+  int text_height = renderer->get_line_height();
+  // 居中
+  int center_x = renderer->get_page_width() / 2;
+
+  int usable_height = renderer->get_page_height() - 35; 
+  int center_y = 35 + usable_height / 2; 
+  int x_pos = center_x - text_width / 2;
+  int y_pos = center_y - text_height / 2;
+  
+  renderer->draw_text(x_pos, y_pos, welcome_text, true);
+  // 显示
+  renderer->flush_display();
+  
+  rt_thread_delay(500);
+  close_tp_lcd();
+}
+
+void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_redraw)
+{
+  uint32_t start_tick = rt_tick_get();
+  switch (ui_state)
+  {
+  case READING_EPUB:
+    handleEpub(renderer, ui_action);
+    break;
+  case SELECTING_TABLE_CONTENTS:
+    handleEpubTableContents(renderer, ui_action, needs_redraw);
+    break;
+  case SELECTING_EPUB:
+  default:
+    handleEpubList(renderer, ui_action, needs_redraw);
+    break;
+  }
+  rt_kprintf("Renderer time=%d \r\n", rt_tick_get() - start_tick);
+}
+
+
+
+void HAL_LPAON_Sleep(void)
+{
+    hwp_lpsys_aon->WER |= LPSYS_AON_WER_HP2LP_REQ;
+    // HAL_HPAON_CANCEL_LP_ACTIVE_REQUEST();
+    HAL_LPAON_DISABLE_PAD();
+    HAL_LPAON_DISABLE_AON_PAD();
+#ifndef SF32LB55X
+    HAL_LPAON_DISABLE_VLP();
+#endif
+    /* force lpsys to enter sleep */
+    hwp_lpsys_aon->PMR = (3UL << LPSYS_AON_PMR_MODE_Pos) | (1 << LPSYS_AON_PMR_CPUWAIT_Pos) | (1 << LPSYS_AON_PMR_FORCE_SLEEP_Pos);
+}
+
 
 void main_task(void *param)
 {
@@ -238,7 +353,7 @@ void main_task(void *param)
   board->power_up();
   // create the renderer for the board
   ulog_i("main", "Creating renderer");
-  Renderer *renderer = board->get_renderer();
+  ::renderer = board->get_renderer();
   // bring the file system up - SPIFFS or SDCard depending on the defines in platformio.ini
   ulog_i("main", "Starting file system");
   board->start_filesystem();
@@ -263,7 +378,7 @@ void main_task(void *param)
   // set the controls up
   ulog_i("main", "Setting up controls");
   ButtonControls *button_controls = board->get_button_controls(ui_queue);
-  TouchControls *touch_controls = board->get_touch_controls(renderer, ui_queue);
+  ::touch_controls = board->get_touch_controls(renderer, ui_queue);
 
   ulog_i("main", "Controls configured");
   // work out if we were woken from deep sleep
@@ -290,25 +405,71 @@ void main_task(void *param)
   }
   touch_controls->render(renderer);
   renderer->flush_display();
-
+  close_tp_lcd();
   // keep track of when the user last interacted and go to sleep after N seconds
   rt_tick_t last_user_interaction = rt_tick_get_millisecond();
-  while (rt_tick_get_millisecond() - last_user_interaction < 120 * 1000 * 1000)
+
+  while (rt_tick_get_millisecond() - last_user_interaction < 60 * 1000 *100)
   {
+    // 检查是否超过60秒无操作
+    if (rt_tick_get_millisecond() - last_user_interaction >= 120 * 1000)
+    {
+      draw_welcome_page(battery);
+      // 等待用户交互以退出屏保
+      while (true)
+      {
+        UIAction ui_action = NONE;
+        if (rt_mq_recv(ui_queue, &ui_action, sizeof(UIAction), RT_WAITING_FOREVER) == RT_EOK)
+        {
+          if (ui_action != NONE)
+          {
+            // 有用户交互，退出屏保，重新进入主界面
+            last_user_interaction = rt_tick_get_millisecond();
+            
+            open_tp_lcd();
+            
+            bool hydrate_success = renderer->hydrate();
+            if (!hydrate_success) {
+              renderer->reset();
+              renderer->set_margin_top(35);
+              renderer->set_margin_left(10);
+              renderer->set_margin_right(10);
+            }
+            
+            handleUserInteraction(renderer, ui_action, !hydrate_success);
+            
+            if (battery)
+            {
+              draw_charge_status(renderer, battery);
+              draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
+            }
+            touch_controls->render(renderer);
+            
+            //显示
+            renderer->flush_display();
+            close_tp_lcd();
+            break;
+          }
+        }
+      }
+    }
+
     UIAction ui_action = NONE;
     // wait for something to happen for 60 seconds
     if (rt_mq_recv(ui_queue, &ui_action, sizeof(UIAction), rt_tick_from_millisecond(60000)) == RT_EOK)
     {
+      open_tp_lcd();
       if (ui_action != NONE)
       {
+        //rt_kprintf("ui_action = %d\n", ui_action);
         // something happened!
         last_user_interaction = rt_tick_get_millisecond();
         // show feedback on the touch controls
-        touch_controls->renderPressedState(renderer, ui_action);
-        handleUserInteraction(renderer, ui_action, false);
+         touch_controls->renderPressedState(renderer, ui_action);
+         handleUserInteraction(renderer, ui_action, false);
 
-        // make sure to clear the feedback on the touch controls
-        touch_controls->render(renderer);
+        // // make sure to clear the feedback on the touch controls
+         touch_controls->render(renderer);
       }
     }
     // update the battery level - do this even if there is no interaction so we
@@ -319,11 +480,16 @@ void main_task(void *param)
       draw_charge_status(renderer, battery);
       draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
     }
+    open_tp_lcd();
     renderer->flush_display();
+    close_tp_lcd();
   }
+
   ulog_i("main", "Saving state");
   // save the state of the renderer
   renderer->dehydrate();
+
+
   // turn off the filesystem
   board->stop_filesystem();
   // get ready to go to sleep
@@ -336,10 +502,13 @@ void main_task(void *param)
   // go to sleep
   //esp_deep_sleep_start();
 }
+
 extern "C"
 {
   int main()
   {
+    rt_pm_request(PM_SLEEP_MODE_IDLE);
+    HAL_LPAON_Sleep();
     // dump out the epub list state
     ulog_i("main", "epub list state num_epubs=%d", epub_list_state.num_epubs);
     ulog_i("main", "epub list state is_loaded=%d", epub_list_state.is_loaded);

@@ -13,13 +13,12 @@ L2_NON_RET_BSS_SECT(frambuf, ALIGN(64) static uint8_t framebuffer1[EPD_WIDTH * E
 L2_NON_RET_BSS_SECT_END
 
 }
-static rt_device_t lcd_device = NULL;
+extern uint8_t touch_enable;
 
-class SF32PaperRenderer : public EpdiyFrameBufferRenderer
-{
+class SF32PaperRenderer : public EpdiyFrameBufferRenderer {
 private:
   // M5EPD_Driver driver;
-
+  rt_device_t lcd_device = NULL;
 public:
   SF32PaperRenderer(
       const EpdFont *regular_font,
@@ -31,8 +30,9 @@ public:
       int busy_icon_height)
       : EpdiyFrameBufferRenderer(regular_font, bold_font, italic_font, bold_italic_font, busy_icon, busy_icon_width, busy_icon_height)
   {
- 
     lcd_device = rt_device_find("lcd");
+    rt_kprintf("在构造函数中, lcd_device指针变量本身的地址: %p\n", &lcd_device);
+    rt_kprintf("在构造函数中, lcd_device指向的设备地址: %p\n", lcd_device);
     if (rt_device_open(lcd_device, RT_DEVICE_OFLAG_RDWR) == RT_EOK)
     {
         struct rt_device_graphic_info info;
@@ -72,6 +72,35 @@ public:
   bool has_gray() 
   {
     return false;
+  }
+
+  void powerOffLcd()
+  {
+    const uint8_t idle_mode_on = 1;            
+    if (lcd_device)
+    {
+        rt_device_control(lcd_device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+        rt_kprintf("LCD已关闭电源\n");
+      
+    }
+    else
+    {
+      rt_kprintf("没找到LCD设备\n");
+    }
+  }
+
+  void powerOnLcd()
+  {
+
+    if (lcd_device)
+    {
+      rt_device_control(lcd_device, RTGRAPHIC_CTRL_POWERON, NULL);
+      rt_kprintf("LCD已开启电源\n");
+    }
+    else
+    {
+      rt_kprintf("没找到LCD设备\n");
+    }
   }
 
   void flush_area(int x, int y, int width, int height)
