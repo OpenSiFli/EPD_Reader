@@ -1,4 +1,8 @@
-
+/*
+ * SPDX-FileCopyrightText: 2019-2022 SiFli Technologies(Nanjing) Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include "bsp_board.h"
 //#include "epd_tps.h"
 extern void BSP_GPIO_Set(int pin, int val, int is_porta);
