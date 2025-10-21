@@ -83,21 +83,15 @@ bool RubbishHtmlParser::VisitEnter(const tinyxml2::XMLElement &element, const ti
     const char *src = element.Attribute("src");
     if (src)
     {
-      // don't leave an empty text block in the list
       BLOCK_STYLE style = currentTextBlock->get_style();
       if (currentTextBlock->is_empty())
       {
         blocks.pop_back();
         delete currentTextBlock;
-        currentTextBlock = nullptr;
       }
       blocks.push_back(new ImageBlock(m_base_path + src));
-      // start a new text block - with the same style as before
-      startNewTextBlock(style);
-    }
-    else
-    {
-      ulog_e(TAG, "Could not find src attribute");
+      currentTextBlock = new TextBlock(style);
+      blocks.push_back(currentTextBlock);
     }
   }
   else if (matches(tag_name, SKIP_TAGS, NUM_SKIP_TAGS))
@@ -107,18 +101,23 @@ bool RubbishHtmlParser::VisitEnter(const tinyxml2::XMLElement &element, const ti
   else if (matches(tag_name, HEADER_TAGS, NUM_HEADER_TAGS))
   {
     is_bold = true;
-    startNewTextBlock(CENTER_ALIGN);
+    currentTextBlock = new TextBlock(CENTER_ALIGN);
+    blocks.push_back(currentTextBlock);
   }
-  else if (matches(tag_name, BLOCK_TAGS, NUM_BLOCK_TAGS))
+
+  else if (matches(tag_name, BLOCK_TAGS, NUM_BLOCK_TAGS) && strcmp(tag_name, "br") != 0)
   {
-    if (strcmp(tag_name, "br") == 0)
+    BLOCK_STYLE style;
+    if (strcmp(tag_name, "li") == 0)
     {
-      startNewTextBlock(currentTextBlock->get_style());
+        style = LEFT_ALIGN;
     }
     else
     {
-      startNewTextBlock(JUSTIFIED);
+        style = JUSTIFIED;
     }
+    currentTextBlock = new TextBlock(style);
+    blocks.push_back(currentTextBlock);
   }
   else if (matches(tag_name, BOLD_TAGS, NUM_BOLD_TAGS))
   {

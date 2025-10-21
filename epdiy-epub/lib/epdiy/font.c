@@ -270,7 +270,21 @@ void epd_get_text_bounds(const EpdFont *font, const char *string,
 
 static bool is_delimiter(uint32_t c)
 {
-  return ((c == ' ' || c == '\r' || c == '\n') || (c >=0x4e00 && c <=0x9fa5));
+  bool is_original = (c == ' ' || c == '\r' || c == '\n') || (c >= 0x4e00 && c <= 0x9fa5);
+  bool is_punct = (c == 0xFF0C)  // ，
+                || (c == 0xFF1F)  // ？
+                || (c == 0xFF1A)  // ：
+                || (c == 0xFF01)  // ！
+                || (c == 0x3001)  // 、
+                || (c == 0xFF0E)  // 。
+                || (c == 0xFF1B)  // ；
+                || (c == 0x201C)  // “
+                || (c == 0x201D)  // ”
+                || (c == 0x300A)  // 《
+                || (c == 0x300B)  // 》
+                || (c == 0x2026)  // ……
+                || (c == 0x2014); // ——
+  return is_original || is_punct;
 }
 
 
