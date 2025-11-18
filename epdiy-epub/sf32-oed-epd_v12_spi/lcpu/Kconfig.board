@@ -1,0 +1,7 @@
+config BSP_USING_BOARD_SF32_OED_EPD_V12_SPI
+    bool
+    select SOC_SF32LB52X
+    select BF0_LCPU
+    default y
+
+rsource "../Kconfig.board"

@@ -3,9 +3,9 @@ from building import *
 cwd = GetCurrentDir()
 inc = [cwd]
 src = Glob('*.c')
-CPPPATH = [cwd + '/../common', cwd]
+CPPPATH = [cwd + '/../../common', cwd]
 
 if not GetDepend('BSP_USING_BUILT_LCD'):
-    group = DefineGroup('Drivers', src, depend = [''], CPPPATH = CPPPATH)
+    group = DefineGroup('Drivers', src, depend = ['LCD_USING_EPD_SPI'], CPPPATH = CPPPATH)
 
 Return('group')

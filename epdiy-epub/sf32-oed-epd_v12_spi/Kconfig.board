@@ -1,0 +1,52 @@
+config ASIC
+    bool 
+    default y 
+
+config TOUCH_PWR_PIN
+    int
+    default 32
+
+config TOUCH_IRQ_PIN
+    int
+    default 30
+
+config TOUCH_RESET_PIN
+    int
+    default 31
+
+    config CHG_STATUS
+    int
+    default    26
+
+    config TPS_SDA
+    int
+    default    11
+    config TPS_SCL
+    int
+    default   10
+
+    config EPD_SDA
+    int
+    default  5
+    config EPD_DC
+    int
+    default  6
+    config EPD_RES
+    int
+    default  0
+
+    config EPD_CS
+    int
+    default  3
+    config EPD_KEY_GPADC
+    int
+    default  33
+    config EPD_KEY1
+    int
+    default  34
+    config EPD_SCK
+    int
+    default  4
+    config EPD_BUSY
+    int
+    default   7

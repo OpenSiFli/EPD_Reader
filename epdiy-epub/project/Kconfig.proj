@@ -10,6 +10,7 @@ config CUSTOM_MEM_MAP
 
 choice EPD_EPUB_COLOR_DEPTH
 	prompt "Select output framebuffer color depth"
+	default EPDIY_EPUB_1BPP if LCD_USING_EPD_OPMO37A3
 	default EPDIY_EPUB_4BPP
 	config EPDIY_EPUB_1BPP
 		bool "EPDIY_EPUB_1BPP"
@@ -18,10 +19,11 @@ choice EPD_EPUB_COLOR_DEPTH
 endchoice
 
 if !BSP_USING_BUILT_LCD
+
 	config LCD_USING_R7D005_130
 		bool
 		default n
-	
+
 	config LCD_USING_YZC085_V100
 	    bool 
 		default n
@@ -29,17 +31,22 @@ if !BSP_USING_BUILT_LCD
 	config LCD_USING_TE067XJHE01_V10
 	    bool 
 		default n
-
-	config LCD_USING_EPD_CUSTOM
-	    bool 
-		default n
-
 	config EPD_WAVEFORM_USE_BIN
 	    bool 
 		default n
 
 	config TSC_USING_FT5446U_V01
 		bool
+		default n
+	config LCD_USING_EPD_SPI
+		bool
+		default n
+
+	config TSC_USING_FT6336U
+		bool
+		default n
+	config LCD_USING_EPD_CUSTOM
+	    bool 
 		default n
 
     choice
@@ -53,7 +60,7 @@ if !BSP_USING_BUILT_LCD
 			select BSP_LCDC_USING_EPD_8BIT
 
 		config LCD_USING_EPD_YZC085_V100
-			bool "6.0 rect electronic paper display(EPD YZC052_V1.05 1032x758)"
+			bool "6.0 rect electronic paper display(EPD YZC085_V1.05 1032x758)"
 			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
 			select LCD_USING_YZC085_V100
 			select BSP_LCDC_USING_EPD_8BIT
@@ -63,6 +70,12 @@ if !BSP_USING_BUILT_LCD
 			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
 			select LCD_USING_YZC085_V100
 			select BSP_LCDC_USING_EPD_8BIT
+
+		config LCD_USING_EPD_OPMO37A3
+			bool "3.7 rect electronic paper display  SPI (OPM037A3 240x416)"
+			select TSC_USING_FT6336U if BSP_USING_TOUCHD
+			select LCD_USING_EPD_SPI
+			
 
 		config LCD_USING_EPD_TE067XJHE01_V10
 			bool "6.7 rect electronic paper display(TiamMa TE067XJHE01 V1.0  1920x960)"
@@ -84,6 +97,7 @@ if !BSP_USING_BUILT_LCD
 		default 1920 if LCD_USING_EPD_TE067XJHE01_V10
 		default 1032 if LCD_USING_EPD_YZC146_V100
 		default 1032 if LCD_USING_EPD_CUSTOM_MODULE
+		default 240 if LCD_USING_EPD_OPMO37A3
     config LCD_VER_RES_MAX
         int
         default 1072 if LCD_USING_EPD_R7D005
@@ -91,6 +105,7 @@ if !BSP_USING_BUILT_LCD
 		default 960  if LCD_USING_EPD_TE067XJHE01_V10
 		default 758  if LCD_USING_EPD_YZC146_V100
 		default 758  if LCD_USING_EPD_CUSTOM_MODULE
+		default 416  if LCD_USING_EPD_OPMO37A3
     config LCD_DPI
         int
         default 315 if LCD_USING_EPD_R7D005
@@ -98,4 +113,5 @@ if !BSP_USING_BUILT_LCD
 		default 320 if LCD_USING_EPD_TE067XJHE01_V10
 		default 300 if LCD_USING_EPD_YZC146_V100
 		default 300 if LCD_USING_EPD_CUSTOM_MODULE
+		default 130 if LCD_USING_EPD_OPMO37A3
 endif

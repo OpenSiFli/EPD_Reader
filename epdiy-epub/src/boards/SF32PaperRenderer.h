@@ -5,11 +5,15 @@
 #include "boards/controls/SF32_TouchControls.h"
 extern "C" {
 #include "mem_section.h"
-#include "epd_tps.h"
+
 #include "epd_pin_defs.h"
 L2_NON_RET_BSS_SECT_BEGIN(frambuf)
-// L2_NON_RET_BSS_SECT(frambuf, ALIGN(64) static uint8_t framebuffer1[(EPD_WIDTH * EPD_HEIGHT + 7) / 8]);//1bpp
+#ifdef EPDIY_EPUB_1BPP
+L2_NON_RET_BSS_SECT(frambuf, ALIGN(64) static uint8_t framebuffer1[(EPD_WIDTH * EPD_HEIGHT + 7) / 8]);//1bpp
+#else
 L2_NON_RET_BSS_SECT(frambuf, ALIGN(64) static uint8_t framebuffer1[EPD_WIDTH * EPD_HEIGHT / 2]);
+#endif
+
 L2_NON_RET_BSS_SECT_END
 
 }
@@ -17,6 +21,7 @@ class SF32PaperRenderer : public EpdiyFrameBufferRenderer {
 private:
   // M5EPD_Driver driver;
   rt_device_t lcd_device = NULL;
+  uint8_t idle_mode_on = 0;  
 public:
   SF32PaperRenderer(
       const EpdFont *regular_font,
@@ -43,12 +48,16 @@ public:
         rt_kprintf("Lcd open error!\n");
         return;
     }
+#ifdef EPDIY_EPUB_1BPP
+    uint16_t framebuffer_color_format = RTGRAPHIC_PIXEL_FORMAT_MONO;
+#else
     uint16_t framebuffer_color_format = RTGRAPHIC_PIXEL_FORMAT_GRAY4;
+#endif
     rt_device_control(lcd_device, RTGRAPHIC_CTRL_SET_BUF_FORMAT, &framebuffer_color_format);
 
      m_frame_buffer = (uint8_t *)framebuffer1;
      clear_screen();
-     rt_device_control(lcd_device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    
 
   }
   ~SF32PaperRenderer()
@@ -62,10 +71,12 @@ public:
   }
 
   void powerOffLcd()
-  {      
+  {    
+    // uint8_t idle_mode_on;  
     if (lcd_device)
     {
-        rt_device_control(lcd_device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+      idle_mode_on = 1;
+        rt_device_control(lcd_device, RTGRAPHIC_CTRL_SET_MODE, (void *)&idle_mode_on);
         rt_kprintf("LCD close\n");
 
     }
@@ -80,7 +91,8 @@ public:
 
     if (lcd_device)
     {
-      rt_device_control(lcd_device, RTGRAPHIC_CTRL_POWERON, NULL);
+      idle_mode_on = 0;
+      rt_device_control(lcd_device, RTGRAPHIC_CTRL_SET_MODE, (void *)&idle_mode_on);
 
       rt_kprintf("LCD Open\n");
     }
