@@ -156,7 +156,7 @@ void ADCBattery::battery_check_callback(void* parameter)
         rt_kprintf("[ADCBattery] Battery Level %f, percent %d\n", voltage, (int)percentage);
         
         // 发送消息到UI队列
-        if (percentage < 20.0f && !is_charging && battery->low_power != 1) {
+        if (percentage < 2.0f && !is_charging && battery->low_power != 1) {
             battery->low_power = 1;        
             UIAction msg = MSG_DRAW_LOW_POWER_PAGE;
             rt_mq_send(battery->ui_queue, &msg, sizeof(UIAction));
@@ -168,7 +168,7 @@ void ADCBattery::battery_check_callback(void* parameter)
             rt_mq_send(battery->ui_queue, &msg, sizeof(UIAction));
         }
         // 如果电量充足且之前处于低电量模式，则恢复正常模式
-        else if (percentage >= 20.0f && battery->low_power == 1) 
+        else if (percentage >= 2.0f && battery->low_power == 1) 
         {
             battery->low_power = 0;           
             UIAction msg = MSG_DRAW_WELCOME_PAGE;
