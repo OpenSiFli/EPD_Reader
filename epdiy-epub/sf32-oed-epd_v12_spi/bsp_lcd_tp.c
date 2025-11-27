@@ -10,18 +10,18 @@ extern void BSP_GPIO_Set(int pin, int val, int is_porta);
 extern void BSP_PIN_LCD(void);
 void BSP_LCD_Reset(uint8_t high1_low0)
 {
+    BSP_GPIO_Set(EPD_RES, high1_low0, 1);
 }
 void BSP_LCD_PowerDown(void)
 {
     
-    HAL_PIN_Set(PAD_PA00 + EPD_CS,    GPIO_A0 + EPD_CS,    PIN_PULLDOWN, 1);
-    HAL_PIN_Set(PAD_PA00 + EPD_SCK,    GPIO_A0 + EPD_SCK,    PIN_PULLDOWN, 1);
-    HAL_PIN_Set(PAD_PA00 + EPD_SDA,    GPIO_A0 + EPD_SDA,    PIN_PULLDOWN, 1);
-    HAL_PIN_Set(PAD_PA00 + EPD_DC,    GPIO_A0 + EPD_DC,    PIN_PULLDOWN, 1);
-
-  
-    
-}
+    HAL_PIN_Set(PAD_PA00 + EPD_CS, GPIO_A0 + EPD_CS, PIN_PULLDOWN, 1);
+    HAL_PIN_Set(PAD_PA00 + EPD_SCK, GPIO_A0 + EPD_SCK, PIN_PULLDOWN, 1);
+    HAL_PIN_Set(PAD_PA00 + EPD_SDA,  GPIO_A0 + EPD_SDA, PIN_PULLDOWN, 1);
+    HAL_PIN_Set(PAD_PA00 + EPD_DC,  GPIO_A0 + EPD_DC, PIN_PULLDOWN, 1);
+    HAL_PIN_Set(PAD_PA00 + EPD_BUSY,  GPIO_A7, PIN_PULLDOWN, 1);
+    HAL_PIN_Set(PAD_PA00 + EPD_RES,  GPIO_A0, PIN_PULLDOWN, 1);
+     }
 void BSP_LCD_PowerUp(void)
 {
 

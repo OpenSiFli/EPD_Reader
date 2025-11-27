@@ -697,7 +697,16 @@ static void LCD_SetBrightness(LCDC_HandleTypeDef *hlcdc, uint8_t br)
         LOG_E("Can't find device lcdlight!");
     }
 }
+static void LCD_IdleModeOn(LCDC_HandleTypeDef *hlcdc)
+{
+    BSP_LCD_PowerDown();
+}
 
+static void LCD_IdleModeOff(LCDC_HandleTypeDef *hlcdc)
+{
+    BSP_LCD_PowerUp();
+    LCD_Init(hlcdc);
+}   
 
 static const LCD_DrvOpsDef LCD_drv =
 {
@@ -714,8 +723,8 @@ static const LCD_DrvOpsDef LCD_drv =
 
     LCD_SetColorMode,
     LCD_SetBrightness,
-    NULL,
-    NULL
+    LCD_IdleModeOn,
+    LCD_IdleModeOff
 };
 
 LCD_DRIVER_EXPORT2(epd_display, LCD_ID, &lcdc_int_cfg, &LCD_drv, 1);
