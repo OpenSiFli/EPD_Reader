@@ -89,7 +89,7 @@ static void epd_sem_init(void)
 {
     if (epd_busy_sem != RT_NULL)
     {
-        return;
+         return;
     }
     epd_busy_sem = rt_sem_create("epd_busy", 0, RT_IPC_FLAG_FIFO);
     if (epd_busy_sem == RT_NULL)
@@ -210,6 +210,11 @@ static void LCD_Drv_Init(LCDC_HandleTypeDef *hlcdc)
     parameter[0] = 0xB7;
     LCD_WriteReg(hlcdc, REG_VCOM_DATA_INTERV, parameter, 1);
 
+}
+static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
+{
+    uint8_t parameter[5];
+    LCD_Drv_Init(hlcdc);
     EPD_LoadLUT(hlcdc, 0);
     EPD_DisplayImage(hlcdc,PIC_WHITE);  
 
@@ -217,11 +222,6 @@ static void LCD_Drv_Init(LCDC_HandleTypeDef *hlcdc)
     LCD_WriteReg(hlcdc, REG_VCOM_DATA_INTERV, parameter, 1);
 
     EPD_TemperatureMeasure(hlcdc);
-
-}
-static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
-{
-    LCD_Drv_Init(hlcdc);
 }
 
 static uint32_t LCD_ReadID(LCDC_HandleTypeDef *hlcdc)
@@ -326,13 +326,16 @@ static void LCD_SetBrightness(LCDC_HandleTypeDef *hlcdc, uint8_t br)
 static void LCD_IdleModeOn(LCDC_HandleTypeDef *hlcdc)
 {
     EPD_EnterDeepSleep(hlcdc);
-    LOG_I("EPD enter idle mode (deep sleep)");
+    BSP_LCD_PowerDown();
+    BSP_LCD_Reset(0);
 }
 
 static void LCD_IdleModeOff(LCDC_HandleTypeDef *hlcdc)
 {
-    // LOG_W("EPD idle mode exit needs hardware reset, re-initializing...");
-
+    BSP_LCD_PowerUp();
+    BSP_LCD_Reset(1);
+    HAL_Delay(1);
+    LCD_Drv_Init(hlcdc);
 }
 static void EPD_LoadLUT(LCDC_HandleTypeDef *hlcdc, uint8_t lut_mode)
 {
