@@ -4,6 +4,9 @@ cwd = GetCurrentDir()
 
 src = Glob('./*.c')
 
+if not GetDepend('USING_BATTERY_CALCULATOR'):
+    SrcRemove(src, 'battery_table.c')
+
 path =  [cwd, 
          os.path.join(cwd, '../include')]
 
