@@ -185,7 +185,8 @@ static void render_settings_page(Renderer *renderer)
   }
   if (settings_selected_idx == SET_TOUCH)
   {
-    for (int i = 0; i < 2; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
+    // 选中强化：多重描边，提高可见度
+    for (int i = 0; i < 5; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
   }
   else
   {
@@ -213,7 +214,7 @@ static void render_settings_page(Renderer *renderer)
   }
   if (settings_selected_idx == SET_TIMEOUT)
   {
-    for (int i = 0; i < 2; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
+    for (int i = 0; i < 5; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
   }
   else
   {
@@ -246,7 +247,7 @@ static void render_settings_page(Renderer *renderer)
   }
   if (settings_selected_idx == SET_FULL_REFRESH)
   {
-    for (int i = 0; i < 2; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
+    for (int i = 0; i < 5; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
   }
   else
   {
@@ -270,7 +271,7 @@ static void render_settings_page(Renderer *renderer)
   int confirm_y = page_h - confirm_h - 60; // 距离底部位置
   if (settings_selected_idx == SET_CONFIRM)
   {
-    for (int i = 0; i < 2; ++i) renderer->draw_rect(confirm_x + i, confirm_y + i, confirm_w - 2 * i, confirm_h - 2 * i, 0);
+    for (int i = 0; i < 5; ++i) renderer->draw_rect(confirm_x + i, confirm_y + i, confirm_w - 2 * i, confirm_h - 2 * i, 0);
   }
   else
   {

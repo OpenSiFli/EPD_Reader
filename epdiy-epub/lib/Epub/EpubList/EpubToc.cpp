@@ -168,7 +168,7 @@ void EpubToc::render()
   int btn_h = 80;
   int btn_y = area_y + (bottom_area_height - btn_h) / 2;
   int btn_x0 = btn_gap;                    // 上一页
-  int btn_x1 = btn_gap * 2 + btn_w;        // 书库
+  int btn_x1 = btn_gap * 2 + btn_w;        // 主页面
   int btn_x2 = btn_gap * 3 + btn_w * 2;    // 下一页
 
   auto draw_button = [&](int x, const char* text, bool selected)
@@ -194,25 +194,8 @@ void EpubToc::render()
   };
 
   draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
-  int start_up_page_x = btn_x0;
-  int start_up_page_y = btn_y + btn_gap * 2;
-  int end_up_page_x = btn_w;
-  int end_up_page_y = btn_h;
-  int start_page_x = btn_x0;
-  static_add_area(start_up_page_x, start_up_page_y, end_up_page_x, end_up_page_y, 6);
-
   draw_button(btn_x1, "书库", m_bottom_mode && m_bottom_idx == 1);
-  int start_main_page_x = btn_x1;
-  int start_main_page_y = btn_y + btn_gap *2;
-  int end_main_page_x = btn_w;
-  int end_main_page_y = btn_h;
-  static_add_area(start_main_page_x, start_main_page_y, end_main_page_x, end_main_page_y, 7);
   draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
-  int start_down_page_x = btn_x2;
-  int start_down_page_y = btn_y + btn_gap *2;
-  int end_down_page_x = btn_w;
-  int end_down_page_y = btn_h;
-  static_add_area(start_down_page_x, start_down_page_y, end_down_page_x, end_down_page_y, 8);
 }
 
 uint16_t EpubToc::get_selected_toc()
