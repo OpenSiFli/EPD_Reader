@@ -83,7 +83,7 @@ typedef enum {
   OPTION_CONTINUE_READING,   // 继续阅读 -> 打印 2
   OPTION_ENTER_SETTINGS      // 进入设置 -> 打印 3
 } MainOption;
-
+void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_redraw);
 void handleEpub(Renderer *renderer, UIAction action)
 {
   if (!reader)
@@ -116,12 +116,60 @@ void handleEpub(Renderer *renderer, UIAction action)
   case SELECT:
     if (reader->is_overlay_active())
     {
-      // 在覆盖层中，SELECT仅作用于覆盖区域：当选中"确认"时关闭覆盖层
-      if (reader->get_overlay_selected() == 8)
+      int sel = reader->get_overlay_selected();
+      if (sel == 9) //目录
       {
+        ui_state = SELECTING_TABLE_CONTENTS;
+        reader->stop_overlay();
+        delete reader;
+        reader = nullptr;
+        contents = new EpubToc(epub_list_state.epub_list[epub_list_state.selected_item], epub_index_state, renderer);
+        contents->load();
+        contents->set_needs_redraw();
+        handleEpubTableContents(renderer, NONE, true);
+        return;
+      }
+      else if (sel == 8) //确认：1.按第六格累积值跳页
+      {
+        int delta = reader->overlay_get_jump();
+        if (delta != 0)
+        {
+          reader->jump_pages(delta);
+        }
+        reader->overlay_reset_jump();
         reader->stop_overlay();
       }
-      // 非“确认”暂不执行其他操作
+      else if (sel == 10) //书库
+      {
+        ui_state = SELECTING_EPUB;
+        reader->stop_overlay();
+        renderer->clear_screen();
+        delete reader;
+        reader = nullptr;
+        if (!epub_list)
+        {
+          epub_list = new EpubList(renderer, epub_list_state);
+        }
+        handleEpubList(renderer, NONE, true);
+        return;
+      }
+      else if (sel == 3)
+      {
+        reader->overlay_add_jump(-5);
+      }
+      else if (sel == 4) 
+      {
+        reader->overlay_add_jump(-1);
+      }
+      else if (sel == 6)
+      {
+        reader->overlay_add_jump(1);
+      }
+      else if (sel == 7) 
+      {
+        reader->overlay_add_jump(5);
+      }
+      
     }
     else
     {

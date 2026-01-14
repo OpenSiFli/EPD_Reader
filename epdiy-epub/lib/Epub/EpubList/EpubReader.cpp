@@ -157,15 +157,24 @@ void EpubReader::render_overlay()
       {
         renderer->draw_rect(x, y, btn_w, row_h, 80);
       }
-      // 文本：第9个显示"确认"，其余显示编号
+      // 文本映射：
+      // 1:"<"  2:保留原编号  3:">"  4:"-5"  5:"-1"  6:"acc"  7:"+1"  8:"+5"  9:"确认" 10:"目录" 11:"书库"
       char label[16];
-      if (index == 8)
+      switch (index)
       {
-        rt_snprintf(label, sizeof(label), "确认");
-      }
-      else
-      {
-        rt_snprintf(label, sizeof(label), "%d", index + 1);
+        case 0: rt_snprintf(label, sizeof(label), "<"); break;
+        case 1: rt_snprintf(label, sizeof(label), "2"); break;
+        case 2: rt_snprintf(label, sizeof(label), ">"); break;
+        case 3: rt_snprintf(label, sizeof(label), "-5"); break;
+        case 4: rt_snprintf(label, sizeof(label), "-1"); break;
+        case 5: rt_snprintf(label, sizeof(label), "%d", overlay_jump_acc); break;
+        case 6: rt_snprintf(label, sizeof(label), "+1"); break;
+        case 7: rt_snprintf(label, sizeof(label), "+5"); break;
+        case 8: rt_snprintf(label, sizeof(label), "确认"); break;
+        case 9: rt_snprintf(label, sizeof(label), "目录"); break;
+        case 10: rt_snprintf(label, sizeof(label), "书库"); break;
+        default:
+          break;
       }
       int t_w = renderer->get_text_width(label);
       int t_h = renderer->get_line_height();
@@ -187,4 +196,51 @@ void EpubReader::overlay_move_right()
 {
   if (!overlay_active) return;
   overlay_selected = (overlay_selected + 1) % 11;
+}
+
+void EpubReader::jump_pages(int delta)
+{
+  if (delta == 0) return;
+  if (!parser) //没解析的情况下 则解析当前节
+  {
+    parse_and_layout_current_section();
+  }
+  int spine_count = epub ? epub->get_spine_items_count() : 0; //获取章节总数
+  if (spine_count <= 0) return;
+
+  auto at_book_start = [&]() -> bool {
+    return state.current_section == 0 && state.current_page == 0;
+  };
+  auto at_book_end = [&]() -> bool {
+    // 需要知道当前节页数；parser 非空时有效
+    if (!parser) return false;
+    return (state.current_section == spine_count - 1) && (state.current_page >= state.pages_in_current_section - 1);
+  };
+  // 开始实现页面跳转
+  if (delta > 0)
+  {
+    for (int i = 0; i < delta; ++i)
+    {
+      if (at_book_end()) break;
+      next();
+      // 如果跨节，parser 在 next() 时会置空；后续渲染时会自动 parse
+      if (!parser)
+      {
+        parse_and_layout_current_section();
+      }
+    }
+  }
+  else // delta < 0
+  {
+    for (int i = 0; i < -delta; ++i)
+    {
+      if (at_book_start()) break;
+      prev();
+      if (!parser)
+      {
+        //空则解析
+        parse_and_layout_current_section();
+      }
+    }
+  }
 }
