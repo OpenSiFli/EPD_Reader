@@ -6,6 +6,7 @@
 #include <RubbishHtmlParser/RubbishHtmlParser.h>
 #include "boards/Board.h"
 #include "boards/controls/SF32_TouchControls.h"
+#include "epub_screen.h"
 #include "boards/SF32PaperRenderer.h"
 #include "gui_app_pm.h"
 #include "bf0_pm.h"
@@ -15,7 +16,7 @@
 #undef DBG_LEVEL
 #define  DBG_LEVEL            DBG_LOG //DBG_INFO  //
 #define LOG_TAG                "EPUB.main"
-
+#define TIMEOUT_SHUTDOWN_TIME 5 // 默认关机超时（小时）；0 表示不关机
 #include <rtdbg.h>
 
 
@@ -35,9 +36,11 @@ const char *TAG = "main";
 
 typedef enum
 {
-  SELECTING_EPUB,
+  MAIN_PAGE,           // 新主页面
+  SELECTING_EPUB, 
   SELECTING_TABLE_CONTENTS,
   READING_EPUB,
+  SETTINGS_PAGE        // 通用功能设置页面
 } UIState;
 typedef enum
 {
@@ -47,8 +50,8 @@ typedef enum
   CHARGING_PAGE
 } UIState2;
 
-// default to showing the list of epubs to the user
-UIState ui_state = SELECTING_EPUB;
+// 默认显示新主页面，而非书库页面
+UIState ui_state = MAIN_PAGE;
 UIState2  lowpower_ui_state = MAIN_MENU;
 // the state data for the epub list and reader
 EpubListState epub_list_state;
@@ -63,11 +66,18 @@ static EpubReader *reader = nullptr;
 static EpubToc *contents = nullptr;
 static bool charge_full = false;
 Battery *battery = nullptr;
-// 声明全局变量，以便open_tp_lcd和close_tp_lcd函数可以访问
+// 给open_tp_lcd和close_tp_lcd用的
 Renderer *renderer = nullptr;
 TouchControls *touch_controls = nullptr;
 
 rt_mq_t ui_queue = RT_NULL;
+
+// 主页面选项
+typedef enum {
+  OPTION_OPEN_LIBRARY = 0,   // 打开书库 -> 打印 1
+  OPTION_CONTINUE_READING,   // 继续阅读 -> 打印 2
+  OPTION_ENTER_SETTINGS      // 进入设置 -> 打印 3
+} MainOption;
 
 void handleEpub(Renderer *renderer, UIAction action)
 {
@@ -168,30 +178,6 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
     epub_list->next();
     break;
   case SELECT:
-    // 检查是否选中了底部特殊区域
-    if (epub_list_state.selected_item == -1) {
-      // 打印"1"
-      rt_kprintf("touch open or off\n");
-      bool current_state = touch_controls->isTouchEnabled();
-      touch_controls->setTouchEnable(!current_state);      
-      
-      // 刷新屏幕以更新底部区域的文本显示
-      if (!current_state)  // 之前是关闭状态，现在要打开
-      {                
-        touch_controls->powerOnTouch();
-      }
-      else  // 之前是打开状态，现在要关闭
-      {
-        touch_controls->powerOffTouch();
-      }
-
-      epub_list->render();
-
-
-      return;
-    } 
-    else 
-    {
       // switch to reading the epub
       // setup the reader state
       ui_state = SELECTING_TABLE_CONTENTS;
@@ -201,7 +187,6 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
       contents->set_needs_redraw();
       handleEpubTableContents(renderer, NONE, true);
       return;
-    }
   case NONE:
   default:
     // nothing to do
@@ -288,13 +273,31 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
     uint32_t start_tick = rt_tick_get();
     switch (ui_state)
     {
+    case MAIN_PAGE: // 新主页面
+      handleMainPage(renderer, ui_action, needs_redraw);
+      if (ui_action == SELECT && screen_get_main_selected_option() == 2)
+      {
+        ui_state = SETTINGS_PAGE;
+        (void)handleSettingsPage(renderer, NONE, true);
+      }
+      break;
     case READING_EPUB: //阅读界面
         handleEpub(renderer, ui_action);
         break;
     case SELECTING_TABLE_CONTENTS: //目录界面
         handleEpubTableContents(renderer, ui_action, needs_redraw);
         break;
-    case SELECTING_EPUB:  //电子书列表(主界面)
+    case SETTINGS_PAGE: // 设置页面
+    {
+      bool exit_to_main = handleSettingsPage(renderer, ui_action, needs_redraw);
+      if (exit_to_main)
+      {
+        ui_state = MAIN_PAGE;
+        handleMainPage(renderer, NONE, true);
+      }
+      break;
+    }
+    case SELECTING_EPUB:  //电子书列表页面（书库页面）
     default:
         handleEpubList(renderer, ui_action, needs_redraw);
         break;
@@ -338,15 +341,8 @@ void back_to_main_page()
       renderer->set_margin_top(35);
       renderer->set_margin_left(10);
       renderer->set_margin_right(10);
-     
-      if (!epub_list) 
-      {
-        epub_list = new EpubList(renderer, epub_list_state);
-        if (epub_list->load("/")) 
-        {
-            ulog_i("main", "Epub files loaded");
-        }
-      }
+      // 返回新的主页面，不再默认进入书库页面
+      ui_state = MAIN_PAGE;
       handleUserInteraction(renderer, NONE, true);
       
       if (battery)
@@ -538,6 +534,7 @@ void main_task(void *param)
     // reset the screen
     renderer->reset();
     // make sure the UI is in the right state
+    ui_state = MAIN_PAGE;
     handleUserInteraction(renderer, NONE, true);
   }
 
@@ -557,9 +554,12 @@ void main_task(void *param)
   // keep track of when the user last interacted and go to sleep after N seconds
   rt_tick_t last_user_interaction = rt_tick_get_millisecond();
 
+    // 初始化屏幕模块默认关机超时
+    screen_init(TIMEOUT_SHUTDOWN_TIME);
 
-while (rt_tick_get_millisecond() - last_user_interaction < 60 * 1000 * 60 *5) //5小时无操作自动关机
-{
+    while ((screen_get_timeout_shutdown_hours() == 0) ||
+      (rt_tick_get_millisecond() - last_user_interaction < 60 * 1000 * 60 * screen_get_timeout_shutdown_hours())) // 按设置的小时数无操作自动关机；0为不关机
+  {
 
     // 检查是否超过5分钟无操作,如果是在欢迎页面、充电页面或低电量页面则不跳转
     if (rt_tick_get_millisecond() - last_user_interaction >= 60 * 1000 *5 && 
@@ -687,7 +687,7 @@ extern "C"
   int main()
   {
     // dump out the epub list state
-    //rt_pm_request(PM_SLEEP_MODE_IDLE); 
+    rt_pm_request(PM_SLEEP_MODE_IDLE); 
     ulog_i("main", "epub list state num_epubs=%d", epub_list_state.num_epubs);
     ulog_i("main", "epub list state is_loaded=%d", epub_list_state.is_loaded);
     ulog_i("main", "epub list state selected_item=%d", epub_list_state.selected_item);

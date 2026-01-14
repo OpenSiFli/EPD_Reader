@@ -24,3 +24,9 @@ public:
   void powerOnTouch() override;   
   void powerOffTouch() override;
 };
+
+// 最近一次设置页左右箭头触控标记
+// 行号：0=触控开关，1=超时关机，2=全刷周期；-1=无
+extern volatile int g_touch_last_settings_row;
+// 方向：-1=左(减)，+1=右(加)，0=无
+extern volatile int g_touch_last_settings_dir;

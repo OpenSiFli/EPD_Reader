@@ -6,6 +6,9 @@
     #include "drv_touch.h"
 #endif
 
+volatile int g_touch_last_settings_row = -1;
+volatile int g_touch_last_settings_dir = 0;
+
 rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 {
     SF32_TouchControls *instance = static_cast<SF32_TouchControls*> (dev->user_data);
@@ -29,24 +32,65 @@ rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 
   UIAction action = NONE;
   // LOG_I("TOUCH", "Received touch event %d,%d", x, y);
-  if (x >= 10 && x <= 10 + instance->ui_button_width && y < 200)
-  {
-    action = DOWN;
-    instance->renderPressedState(instance->renderer, UP, false);
-  }
-  else if (x >= 150 && x <= 150 + instance->ui_button_width && y < 200)
-  {
-    action = UP;
-    instance->renderPressedState(instance->renderer, DOWN, false);
-  }
-  else if (x >= 300 && x <= 300 + instance->ui_button_width && y < 200)
-  {
-    action = SELECT;
-  }
-  else
-  {
+  // 主页面底部按键区域:左"<"、右">"、中间文本框
+    int page_w = instance->renderer->get_page_width();
+    int page_h = instance->renderer->get_page_height();
+    int margin_side = 10;
+    int margin_bottom = 60; 
+    int rect_w = 80;
+    int rect_h = 40;
+    int y_bottom = page_h - rect_h - margin_bottom;
+    int left_x = margin_side;
+    int right_x = page_w - rect_w - margin_side;
+    int mid_x = left_x + rect_w + margin_side;
+    int mid_w = right_x - margin_side - mid_x;
 
+    if (x >= left_x && x <= left_x + rect_w && y >= y_bottom && y <= y_bottom + rect_h)
+    {
+      rt_kprintf("Touch left < \n");
+      action = UP;
+    }
+
+    else if (x >= right_x && x <= right_x + rect_w && y >= y_bottom && y <= y_bottom + rect_h)
+    {
+      action = DOWN;
+      rt_kprintf("Touch right > \n");
+    }
+  
+  // 设置页面每行左右箭头触控区域（与设置页布局一致）
+  if (action == NONE)
+  {
+    int page_w2 = instance->renderer->get_page_width();
+    int margin_lr2 = 6;
+    int item_h2 = 100;
+    int gap2 = 54;
+    int arrow_col_w2 = 40;
+    int lh2 = instance->renderer->get_line_height();
+    int y_start2 = 40 + lh2 + 20;
+    g_touch_last_settings_row = -1;
+    g_touch_last_settings_dir = 0;
+    for (int row = 0; row < 3; ++row)
+    {
+      int ry = y_start2 + row * (item_h2 + gap2);
+      int left_ax = margin_lr2;
+      int right_ax = page_w2 - margin_lr2 - arrow_col_w2;
+      if (x >= left_ax && x <= left_ax + arrow_col_w2 && y >= ry && y <= ry + item_h2)
+      {
+        action = UP;
+        g_touch_last_settings_row = row;
+        g_touch_last_settings_dir = -1; // 左=减
+        break;
+      }
+      if (x >= right_ax && x <= right_ax + arrow_col_w2 && y >= ry && y <= ry + item_h2)
+      {
+        action = DOWN;
+        g_touch_last_settings_row = row;
+        g_touch_last_settings_dir = +1; // 右=加
+        break;
+      }
+    }
   }
+
   instance->last_action = action;
   if (action != NONE)
   {
@@ -156,6 +200,8 @@ void SF32_TouchControls::renderPressedState(Renderer *renderer, UIAction action,
   break;
   case LAST_INTERACTION:
   case NONE:
+    break;
+  default:
     break;
   }
   renderer->set_margin_top(35);
