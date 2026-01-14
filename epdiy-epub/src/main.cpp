@@ -36,10 +36,25 @@ extern "C"
 
 const char *TAG = "main";
 
-
+typedef enum
+{
+  MAIN_PAGE,           // 新主页面
+  SELECTING_EPUB, 
+  SELECTING_TABLE_CONTENTS,
+  READING_EPUB,
+  SETTINGS_PAGE        // 通用功能设置页面
+} UIState;
+typedef enum
+{
+  MAIN_MENU,
+  WELCOME_PAGE,
+  LOW_POWER_PAGE,
+  CHARGING_PAGE
+} UIState2;
 
 // 默认显示新主页面，而非书库页面
-AppUIState ui_state = MAIN_PAGE;
+UIState ui_state = MAIN_PAGE;
+UIState2  lowpower_ui_state = MAIN_MENU;
 // the state data for the epub list and reader
 EpubListState epub_list_state;
 // the state data for the epub index list
@@ -82,9 +97,7 @@ typedef enum {
   OPTION_CONTINUE_READING,   // 继续阅读 -> 打印 2
   OPTION_ENTER_SETTINGS      // 进入设置 -> 打印 3
 } MainOption;
-void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_redraw);
 
-//阅读设置页面
 void handleEpub(Renderer *renderer, UIAction action)
 {
     if (!reader)
@@ -525,75 +538,9 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
     }
     break;
   case DOWN:
-    if (library_bottom_mode)
-    {
-      // 底部模式下：DOWN 向右移动；若已在最右（下一页），则返回当前页的列表第一项
-      if (library_bottom_idx < 2)
-      {
-        library_bottom_idx++;
-      }
-      else
-      {
-        int per_page = 4; 
-        int start_idx = (epub_list_state.selected_item / per_page) * per_page;
-        int end_idx = start_idx + per_page - 1;
-        if (end_idx >= epub_list_state.num_epubs) end_idx = epub_list_state.num_epubs - 1;
-        library_bottom_mode = false;
-        epub_list_state.selected_item = start_idx;
-      }
-    }
-    else
-    {
-      int per_page = 4; 
-      int start_idx = (epub_list_state.selected_item / per_page) * per_page;
-      int end_idx = start_idx + per_page - 1;
-      if (end_idx >= epub_list_state.num_epubs) end_idx = epub_list_state.num_epubs - 1;
-      // 若处于当前页最后一个条目，DOWN 切换到底部按钮模式
-      if (epub_list_state.num_epubs > 0 && epub_list_state.selected_item == end_idx)
-      {
-        library_bottom_mode = true;
-        library_bottom_idx = 0; // 上一页
-      }
-      else
-      {
-        epub_list->next();
-      }
-    }
-    break;
-  case SELECT_BOX:
-   // 如果在底部模式，先退出底部模式
-    if (library_bottom_mode) {
-        library_bottom_mode = false;
-    }
-    current_page = epub_list_state.selected_item / 4;  // 当前页面
-    start_index = current_page * 4;                   // 当前页起始索引
-    // 计算全局索引 = 页起始索引 + 页内偏移
-    global_index = start_index + book_index;
-        // 边界检查
-    if (global_index < epub_list_state.num_epubs) 
-    {
-
-        if(book_index == 0)
-        {
-          epub_list->switch_book(global_index);
-        }
-        else if(book_index == 1)
-        {
-          epub_list->switch_book(global_index);
-        }
-        else if(book_index == 2)
-        {
-          epub_list->switch_book(global_index);
-        }
-        else if(book_index == 3)
-        {
-          epub_list->switch_book(global_index);
-        }
-    }
+    epub_list->next();
     break;
   case SELECT:
-       if (library_bottom_mode)
-    {
         int per_page = 4;
         int current_page = epub_list_state.selected_item / per_page;
         int max_page = (epub_list_state.num_epubs == 0) ? 0 : ( (epub_list_state.num_epubs - 1) / per_page );
@@ -636,7 +583,6 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
                 epub_list->set_needs_redraw();
             }
         }
-    }
     else
     {
         // 进入目录选择页面
@@ -738,31 +684,10 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
     {
     case MAIN_PAGE: // 新主页面
       handleMainPage(renderer, ui_action, needs_redraw);
-      if (ui_action == SELECT && screen_get_main_selected_option() == 2) //切换到设置页面
+      if (ui_action == SELECT && screen_get_main_selected_option() == 2)
       {
         ui_state = SETTINGS_PAGE;
-        (void)handleSettingsPage(renderer, NONE, true);   
-      }
-      else if (ui_action == SELECT && screen_get_main_selected_option() == 1)  //继续阅读
-      {
-        // 判断是否有继续阅读记录
-        if (!(g_last_read_index >= 0 && g_last_read_index < epub_list_state.num_epubs)) {
-          return; // 无记录，忽略
-        }
-        // 有记录，恢复阅读
-        if (reader) { delete reader; reader = nullptr; }
-        int last_idx = g_last_read_index;
-        EpubListItem &last_item = epub_list_state.epub_list[last_idx];
-        reader = new EpubReader(last_item, renderer);
-        reader->set_state_section(last_item.current_section);
-        reader->load();
-        ui_state = READING_EPUB;
-        handleEpub(renderer, NONE);
-      }
-      else if (ui_action == SELECT && screen_get_main_selected_option() == 0)   //切换到书库页面
-      {
-        ui_state = SELECTING_EPUB;
-        handleEpubList(renderer, NONE, true);      
+        (void)handleSettingsPage(renderer, NONE, true);
       }
       break;
     case READING_EPUB: //阅读界面
@@ -831,13 +756,21 @@ void back_to_main_page()
   }
   bool hydrate_success = renderer->hydrate();
 
-  renderer->reset();
-  renderer->set_margin_top(35);
-  renderer->set_margin_left(10);
-  renderer->set_margin_right(10);
-  // 返回新的主页面，不再默认进入书库页面
-  ui_state = MAIN_PAGE;
-  handleUserInteraction(renderer, NONE, true);
+      renderer->reset();
+      renderer->set_margin_top(35);
+      renderer->set_margin_left(10);
+      renderer->set_margin_right(10);
+      // 返回新的主页面，不再默认进入书库页面
+      ui_state = MAIN_PAGE;
+      handleUserInteraction(renderer, NONE, true);
+      
+      if (battery)
+      {
+          draw_charge_status(renderer, battery);
+          draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
+      }
+      touch_controls->render(renderer);
+      renderer->flush_display();
 
   if (battery)
   {
@@ -1045,7 +978,8 @@ void main_task(void *param)
     // 初始化屏幕模块默认关机超时
     screen_init(TIMEOUT_SHUTDOWN_TIME);
 
-  while ((rt_tick_get_millisecond() - last_user_interaction < 60 * 1000 * 60 * TIMEOUT_SHUTDOWN_TIME)) // 5小时
+    while ((screen_get_timeout_shutdown_hours() == 0) ||
+      (rt_tick_get_millisecond() - last_user_interaction < 60 * 1000 * 60 * screen_get_timeout_shutdown_hours())) // 按设置的小时数无操作自动关机；0为不关机
   {
 
     // 检查是否超过设置分钟无操作,如果是在欢迎页面、充电页面或低电量页面则不跳转

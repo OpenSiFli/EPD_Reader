@@ -11,7 +11,7 @@
 void screen_init(int default_timeout_hours);
 
 // 获取当前关机超时设置（小时；0 表示不关机）
-int screen_get_timeout_shutdown_minutes();
+int screen_get_timeout_shutdown_hours();
 
 // 获取当前主页面选中的选项（0: 打开书库, 1: 继续阅读, 2: 进入设置）
 int screen_get_main_selected_option();
@@ -21,7 +21,4 @@ void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw);
 
 // 设置页面交互与渲染；返回 true 表示确认并退出到主页面
 bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw);
-// 切换全刷周期（循环）
-void screen_cycle_full_refresh_period(bool refresh);
-// 获取当前全刷周期值
-int screen_get_full_refresh_period();
+
