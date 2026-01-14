@@ -15,7 +15,7 @@
 static const char *TAG = "PUBLIST";
 
 #define PADDING 20
-#define EPUBS_PER_PAGE 5  
+#define EPUBS_PER_PAGE 4  
 
 void EpubList::next()
 {
@@ -128,8 +128,10 @@ void EpubList::render()
   ulog_d(TAG, "Rendering EPUB list");
   // what page are we on?
   int current_page = state.selected_item / EPUBS_PER_PAGE;
-  // 计算单元格高度（不再预留底部区域）
-  int cell_height = (renderer->get_page_height()) / EPUBS_PER_PAGE;
+  // 计算单元格高度，并为底部按钮预留区域与底部间距
+  const int bottom_area_height = 100; // 底部三按钮区域高度
+  const int bottom_margin = 30;       // 与屏幕底部的间距
+  int cell_height = (renderer->get_page_height() - bottom_area_height - bottom_margin) / EPUBS_PER_PAGE;
   ulog_d(TAG, "Cell height is %d", cell_height);
   int start_index = current_page * EPUBS_PER_PAGE;
   int ypos = 0;
@@ -203,6 +205,45 @@ void EpubList::render()
   }
   state.previous_selected_item = state.selected_item;
   state.previous_rendered_page = current_page;
-  
-    // 移除书库页底部触控开关区域
+  // 绘制底部三按钮区域
+  int page_w = renderer->get_page_width();
+  int page_h = renderer->get_page_height();
+  int area_y = page_h - bottom_area_height - bottom_margin;
+  // 背景
+  renderer->fill_rect(0, area_y, page_w, bottom_area_height, 255);
+  // 三个等宽按钮
+  int btn_gap = 10;
+  int btn_w = (page_w - btn_gap * 4) / 3;
+  int btn_h = 80;
+  int btn_y = area_y + (bottom_area_height - btn_h) / 2;
+  int btn_x0 = btn_gap;                    // 上一页
+  int btn_x1 = btn_gap * 2 + btn_w;        // 主页面
+  int btn_x2 = btn_gap * 3 + btn_w * 2;    // 下一页
+
+  // 高亮边框：当处于底部模式时，高亮当前选择
+  auto draw_button = [&](int x, const char* text, bool selected)
+  {
+    if (selected)
+    {
+      // 加粗描边，表示选中
+      for (int i = 0; i < 5; ++i)
+      {
+        renderer->draw_rect(x + i, btn_y + i, btn_w - 2 * i, btn_h - 2 * i, 0);
+      }
+    }
+    else
+    {
+      // 非选中用细描边
+      renderer->draw_rect(x, btn_y, btn_w, btn_h, 80);
+    }
+    int t_w = renderer->get_text_width(text);
+    int t_h = renderer->get_line_height();
+    int tx = x + (btn_w - t_w) / 2;
+    int ty = btn_y + (btn_h - t_h) / 2;
+    renderer->draw_text(tx, ty, text, false, true);
+  };
+
+  draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
+  draw_button(btn_x1, "主页面", m_bottom_mode && m_bottom_idx == 1);
+  draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
 }

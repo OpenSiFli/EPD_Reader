@@ -60,8 +60,10 @@ void EpubToc::render()
   ulog_d(TAG, "Rendering EPUB index");
   // what page are we on?
   int current_page = state.selected_item / ITEMS_PER_PAGE;
-  // show five items per page
-  int cell_height = renderer->get_page_height() / ITEMS_PER_PAGE;
+  // 为底部按钮预留区域与底部间距
+  const int bottom_area_height = 100;
+  const int bottom_margin = 30;
+  int cell_height = (renderer->get_page_height() - bottom_area_height - bottom_margin) / ITEMS_PER_PAGE;
   int start_index = current_page * ITEMS_PER_PAGE;
   int ypos = 0;
   // starting a fresh page or rendering from scratch?
@@ -118,6 +120,47 @@ void EpubToc::render()
   }
   state.previous_selected_item = state.selected_item;
   state.previous_rendered_page = current_page;
+
+  // 绘制底部三按钮区域
+  int page_w = renderer->get_page_width();
+  int page_h = renderer->get_page_height();
+  int area_y = page_h - bottom_area_height - bottom_margin;
+  // 背景
+  renderer->fill_rect(0, area_y, page_w, bottom_area_height, 255);
+  // 三个等宽按钮
+  int btn_gap = 10;
+  int btn_w = (page_w - btn_gap * 4) / 3; // 左右边距各一个gap，再加中间两个gap
+  int btn_h = 80;
+  int btn_y = area_y + (bottom_area_height - btn_h) / 2;
+  int btn_x0 = btn_gap;                    // 上一页
+  int btn_x1 = btn_gap * 2 + btn_w;        // 主页面
+  int btn_x2 = btn_gap * 3 + btn_w * 2;    // 下一页
+
+  auto draw_button = [&](int x, const char* text, bool selected)
+  {
+    if (selected)
+    {
+      // 多重描边（黑色），与列表选中效果一致
+      for (int i = 0; i < 5; ++i)
+      {
+        renderer->draw_rect(x + i, btn_y + i, btn_w - 2 * i, btn_h - 2 * i, 0);
+      }
+    }
+    else
+    {
+      // 非选中用细描边（灰色）
+      renderer->draw_rect(x, btn_y, btn_w, btn_h, 80);
+    }
+    int t_w = renderer->get_text_width(text);
+    int t_h = renderer->get_line_height();
+    int tx = x + (btn_w - t_w) / 2;
+    int ty = btn_y + (btn_h - t_h) / 2;
+    renderer->draw_text(tx, ty, text, false, true);
+  };
+
+  draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
+  draw_button(btn_x1, "书库", m_bottom_mode && m_bottom_idx == 1);
+  draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
 }
 
 uint16_t EpubToc::get_selected_toc()

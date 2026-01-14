@@ -12,6 +12,11 @@ void button_event_handler(int32_t pin, button_action_t action)
       {
           action_cbk(UIAction::UP); 
       }
+      else if (action == BUTTON_LONG_PRESSED)
+      {
+          rt_kprintf("长按   1");
+          action_cbk(UIAction::UPGLIDE);
+      }
   }
 #else
   if (pin == EPD_KEY1)
@@ -28,10 +33,7 @@ void button_event_handler(int32_t pin, button_action_t action)
         {
             action_cbk(UIAction::SELECT); 
         }
-        else if (action == BUTTON_LONG_PRESSED)
-        {
-            rt_kprintf("长按   1");
-        }
+
     }
     else if (pin == EPD_KEY3)
     {
@@ -39,6 +41,7 @@ void button_event_handler(int32_t pin, button_action_t action)
         {
             action_cbk(UIAction::UP); 
         }
+
     }
 #endif
   
