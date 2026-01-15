@@ -25,6 +25,7 @@ extern "C"
 {
   int main();
   rt_uint32_t heap_free_size(void);
+  extern void set_part_disp_times(int val);
   extern const uint8_t low_power_map[];
   extern const uint8_t chargeing_map[];
   extern const uint8_t welcome_map[];
@@ -84,6 +85,7 @@ typedef enum {
   OPTION_ENTER_SETTINGS      // 进入设置 -> 打印 3
 } MainOption;
 void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_redraw);
+
 void handleEpub(Renderer *renderer, UIAction action)
 {
   if (!reader)
@@ -156,7 +158,8 @@ void handleEpub(Renderer *renderer, UIAction action)
         }
         else
         {
-          reader->overlay_cycle_full_refresh();  //设置全刷周期，在 5/10/20/不刷新 之间循环
+          reader->overlay_cycle_full_refresh();  //设置全刷周期，在 5/10/20/每次(0) 之间循环
+          set_part_disp_times(reader->overlay_get_full_refresh_value());
         }
       }
       if (sel == 9) //目录

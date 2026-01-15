@@ -22,7 +22,7 @@ private:
   OverlayCenterMode overlay_center_mode = CENTER_TOUCH;
   // 触控开关当前状态（由上层同步）
   bool overlay_touch_enabled = false;
-  // 全刷周期索引：0->5, 1->10, 2->20, 3->不刷新(0)
+  // 全刷周期索引：0->5, 1->10, 2->20, 3->每次(0)
   int overlay_fr_idx = 0;
 
   void parse_and_layout_current_section();

@@ -3,6 +3,10 @@
 
 
 extern TouchControls *touch_controls;
+extern "C" 
+{
+  extern void set_part_disp_times(int val);
+}
 
 // 主页面选项
 typedef enum 
@@ -13,7 +17,7 @@ typedef enum
 } MainOption;
 
 static MainOption main_option = OPTION_OPEN_LIBRARY; // 默认“打开书库”
-// 全刷周期选项：5、10、20、不刷新(0)
+// 全刷周期选项：5、10、20、每次(0)
 static const int kFullRefreshOptions[] = {5, 10, 20, 0};
 static const int kFullRefreshOptionsCount = sizeof(kFullRefreshOptions) / sizeof(kFullRefreshOptions[0]);
 static int full_refresh_idx = 1; // 默认10次
@@ -283,7 +287,7 @@ static void render_settings_page(Renderer *renderer)
   char buf3[64];
   int fr_val = screen_get_full_refresh_period();
   if (fr_val == 0)
-    rt_snprintf(buf3, sizeof(buf3), "全刷周期：不刷新");
+    rt_snprintf(buf3, sizeof(buf3), "全刷周期：每次");
   else
     rt_snprintf(buf3, sizeof(buf3), "全刷周期：%d 次", fr_val);
   {
@@ -380,6 +384,7 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
       {
         // SELECT 在全刷周期项上为加操作（循环）
         screen_cycle_full_refresh_period();
+        set_part_disp_times(screen_get_full_refresh_period());
         render_settings_page(renderer);
         break;
       }

@@ -47,10 +47,11 @@
 #define REG_VDCS              0x82
 #define REG_WRITE_NEW_DATA   0x13  
 
-static int reflesh_times;         
+static int reflesh_times = 0;         
 static uint8_t current_refresh_mode;
 static unsigned char LUT_Flag = 0;    // LUT切换标志
 static unsigned char Var_Temp = 0;    // 温度值
+static int g_part_disp_times = 10;      // After g_part_disp_times-1 partial refreshes, perform a full refresh once
 
 static LCDC_InitTypeDef lcdc_int_cfg = {
     .lcd_itf = LCDC_INTF_SPI_DCX_1DATA,
@@ -78,6 +79,16 @@ static void EPD_EnterDeepSleep(LCDC_HandleTypeDef *hlcdc);
 static void EPD_LoadLUT(LCDC_HandleTypeDef *hlcdc, uint8_t lut_mode);
 
 static rt_sem_t epd_busy_sem = RT_NULL; 
+
+void set_part_disp_times(int val) 
+{ 
+    g_part_disp_times = val > 0 ? val : 1;
+    reflesh_times = 1;
+}
+int get_part_disp_times(void) 
+{ 
+    return g_part_disp_times; 
+}
 
 static void epd_busy_callback(void *args)
 {
@@ -123,18 +134,19 @@ static void EPD_ReadBusy(void)
 }
 static uint8_t epd_get_refresh_mode(void)
 {
-    uint8_t mode = 2; // 默认局刷（DU模式）
-
-    if (reflesh_times % PART_DISP_TIMES == 0)
+    uint8_t mode;
+    if (reflesh_times % g_part_disp_times == 0) 
     {
-        mode = 1; // 全刷（GC模式）
-    }
-
-    if (Var_Temp < 0 || Var_Temp > 50)
+        rt_kprintf("cleared all \n");
+        mode = 1; //全刷
+    } 
+    else 
     {
-        mode = 1;
+        rt_kprintf("executing partial refresh, this is the %dth partial refresh (there are %d partial refreshes left until the next full refresh)\n", 
+               (reflesh_times % g_part_disp_times), 
+               g_part_disp_times - (reflesh_times % g_part_disp_times));
+        mode = 2; //局刷
     }
-
     current_refresh_mode = mode;
     return mode;
 }

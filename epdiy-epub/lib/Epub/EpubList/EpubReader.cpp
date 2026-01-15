@@ -151,7 +151,7 @@ void EpubReader::render_overlay()
         {
           int v = overlay_get_full_refresh_value();
           if (v == 0)
-            rt_snprintf(label, cap, "全刷周期：不刷新");
+            rt_snprintf(label, cap, "全刷周期：每次");
           else
             rt_snprintf(label, cap, "全刷周期：%d次", v);
         }
