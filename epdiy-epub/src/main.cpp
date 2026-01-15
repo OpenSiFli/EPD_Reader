@@ -117,6 +117,48 @@ void handleEpub(Renderer *renderer, UIAction action)
     if (reader->is_overlay_active())
     {
       int sel = reader->get_overlay_selected();
+      // 1/3：改变中心属性；2：执行当前属性（触控取反 / 全刷周期循环）
+      if (sel == 0)
+      {
+        if(reader->overlay_is_center_touch())
+        {
+          reader->overlay_set_center_mode_full_refresh();
+        }
+        else
+        {
+          reader->overlay_set_center_mode_touch();
+        }
+      }
+      else if (sel == 2)
+      {
+        if(reader->overlay_is_center_touch())
+        {
+          reader->overlay_set_center_mode_full_refresh();
+        }
+        else
+        {
+          reader->overlay_set_center_mode_touch();
+        }
+        
+      }
+      else if (sel == 1)
+      {
+        // 中心矩形：根据当前属性执行
+        if (reader->overlay_is_center_touch())
+        {
+          bool cur = touch_controls ? touch_controls->isTouchEnabled() : false;
+          if (touch_controls)
+          {
+            touch_controls->setTouchEnable(!cur);
+            if (!cur) touch_controls->powerOnTouch(); else touch_controls->powerOffTouch();
+          }
+          reader->overlay_set_touch_enabled(!cur);
+        }
+        else
+        {
+          reader->overlay_cycle_full_refresh();  //设置全刷周期，在 5/10/20/不刷新 之间循环
+        }
+      }
       if (sel == 9) //目录
       {
         ui_state = SELECTING_TABLE_CONTENTS;
@@ -192,6 +234,10 @@ void handleEpub(Renderer *renderer, UIAction action)
   case UPGLIDE:
     // 激活阅读页下半屏覆盖操作层
     reader->start_overlay();
+    // 默认中心属性为触控开关，初始同步当前触控状态
+    reader->overlay_set_center_mode_touch();
+    if (touch_controls)
+      reader->overlay_set_touch_enabled(touch_controls->isTouchEnabled());
     break;
   case NONE:
   default:

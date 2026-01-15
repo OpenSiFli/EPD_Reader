@@ -12,6 +12,7 @@
 #include "../RubbishHtmlParser/RubbishHtmlParser.h"
 #include "../Renderer/Renderer.h"
 #include "epub_mem.h"
+#include "epub_screen.h"
 static const char *TAG = "EREADER";
 extern "C" rt_uint32_t heap_free_size(void);
 
@@ -121,7 +122,7 @@ void EpubReader::render_overlay()
   int page_h = renderer->get_page_height();
   int area_y = (page_h * 2) / 3;    // 覆盖下方 1/3 屏幕
   int area_h = page_h - area_y;
-  // 半透明效果不可用，使用浅灰底区分
+  
   renderer->fill_rect(0, area_y, page_w, area_h, 240);
 
   // 三行布局：3,5,3
@@ -136,15 +137,86 @@ void EpubReader::render_overlay()
   if (y0 < area_y + 4) y0 = area_y + 4;
 
   int index = 0;
+  auto fill_label = [&](int idx, char *label, size_t cap) {
+    switch (idx)
+    {
+      case 0: rt_snprintf(label, cap, "<"); break;
+      case 1:
+      {
+        if (overlay_center_mode == CENTER_TOUCH)
+        {
+          rt_snprintf(label, cap, "触摸开关：%s", overlay_touch_enabled ? "开" : "关");
+        }
+        else
+        {
+          int v = overlay_get_full_refresh_value();
+          if (v == 0)
+            rt_snprintf(label, cap, "全刷周期：不刷新");
+          else
+            rt_snprintf(label, cap, "全刷周期：%d次", v);
+        }
+        break;
+      }
+      case 2: rt_snprintf(label, cap, ">"); break;
+      case 3: rt_snprintf(label, cap, "-5"); break;
+      case 4: rt_snprintf(label, cap, "-1"); break;
+      case 5: rt_snprintf(label, cap, "%d", overlay_jump_acc); break;
+      case 6: rt_snprintf(label, cap, "+1"); break;
+      case 7: rt_snprintf(label, cap, "+5"); break;
+      case 8: rt_snprintf(label, cap, "确认"); break;
+      case 9: rt_snprintf(label, cap, "目录"); break;
+      case 10: rt_snprintf(label, cap, "书库"); break;
+      default: label[0] = '\0'; break;
+    }
+  };
   for (int r = 0; r < rows; ++r)
   {
     int c = cols[r];
-    int usable_w = page_w - (c + 1) * gap_w;
-    int btn_w = usable_w / c;
     int y = y0 + gap_h + r * (row_h + gap_h);
-    for (int i = 0; i < c; ++i)
+    // 顶部第1行(3列)采用不等宽布局：1/3半宽，2双宽
+    if (r == 0)
     {
-      int x = gap_w + i * (btn_w + gap_w);
+      int usable_w = page_w - (c + 1) * gap_w;
+      // 宽度权重为 1:3:1（约 左20% / 中60% / 右20%）
+      int w0 = (usable_w * 1) / 5;
+      int w1 = (usable_w * 3) / 5;
+      int w2 = usable_w - w0 - w1; 
+      int widths[3] = { w0, w1, w2 };
+      int cur_x = gap_w;
+      for (int i = 0; i < c; ++i)
+      {
+        int w = widths[i];
+        int x = cur_x;
+        bool selected = (index == overlay_selected);
+        if (selected)
+        {
+          for (int k = 0; k < 5; ++k)
+          {
+            renderer->draw_rect(x + k, y + k, w - 2 * k, row_h - 2 * k, 0);
+          }
+        }
+        else
+        {
+          renderer->draw_rect(x, y, w, row_h, 80);
+        }
+        char label[32];
+        fill_label(index, label, sizeof(label));
+        int t_w = renderer->get_text_width(label);
+        int t_h = renderer->get_line_height();
+        int tx = x + (w - t_w) / 2;
+        int ty = y + (row_h - t_h) / 2;
+        renderer->draw_text(tx, ty, label, false, true);
+        index++;
+        cur_x = x + w + gap_w;
+      }
+    }
+    else
+    {
+      int usable_w = page_w - (c + 1) * gap_w;
+      int btn_w = usable_w / c;
+      for (int i = 0; i < c; ++i)
+      {
+        int x = gap_w + i * (btn_w + gap_w);
       bool selected = (index == overlay_selected);
       if (selected)
       {
@@ -157,31 +229,15 @@ void EpubReader::render_overlay()
       {
         renderer->draw_rect(x, y, btn_w, row_h, 80);
       }
-      // 文本映射：
-      // 1:"<"  2:保留原编号  3:">"  4:"-5"  5:"-1"  6:"acc"  7:"+1"  8:"+5"  9:"确认" 10:"目录" 11:"书库"
-      char label[16];
-      switch (index)
-      {
-        case 0: rt_snprintf(label, sizeof(label), "<"); break;
-        case 1: rt_snprintf(label, sizeof(label), "2"); break;
-        case 2: rt_snprintf(label, sizeof(label), ">"); break;
-        case 3: rt_snprintf(label, sizeof(label), "-5"); break;
-        case 4: rt_snprintf(label, sizeof(label), "-1"); break;
-        case 5: rt_snprintf(label, sizeof(label), "%d", overlay_jump_acc); break;
-        case 6: rt_snprintf(label, sizeof(label), "+1"); break;
-        case 7: rt_snprintf(label, sizeof(label), "+5"); break;
-        case 8: rt_snprintf(label, sizeof(label), "确认"); break;
-        case 9: rt_snprintf(label, sizeof(label), "目录"); break;
-        case 10: rt_snprintf(label, sizeof(label), "书库"); break;
-        default:
-          break;
-      }
+        char label[32];
+        fill_label(index, label, sizeof(label));
       int t_w = renderer->get_text_width(label);
       int t_h = renderer->get_line_height();
       int tx = x + (btn_w - t_w) / 2;
       int ty = y + (row_h - t_h) / 2;
       renderer->draw_text(tx, ty, label, false, true);
       index++;
+      }
     }
   }
 }
@@ -208,11 +264,14 @@ void EpubReader::jump_pages(int delta)
   int spine_count = epub ? epub->get_spine_items_count() : 0; //获取章节总数
   if (spine_count <= 0) return;
 
-  auto at_book_start = [&]() -> bool {
+  //检查是不是第一页
+  auto at_book_start = [&]() -> bool 
+  {
     return state.current_section == 0 && state.current_page == 0;
   };
-  auto at_book_end = [&]() -> bool {
-    // 需要知道当前节页数；parser 非空时有效
+  //检查是不是最后一页
+  auto at_book_end = [&]() -> bool 
+  {
     if (!parser) return false;
     return (state.current_section == spine_count - 1) && (state.current_page >= state.pages_in_current_section - 1);
   };
@@ -238,9 +297,19 @@ void EpubReader::jump_pages(int delta)
       prev();
       if (!parser)
       {
-        //空则解析
+        //空就解析
         parse_and_layout_current_section();
       }
     }
   }
+}
+
+void EpubReader::overlay_cycle_full_refresh()
+{
+  screen_cycle_full_refresh_period();
+}
+
+int EpubReader::overlay_get_full_refresh_value() const
+{
+  return screen_get_full_refresh_period();
 }
