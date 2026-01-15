@@ -2,7 +2,7 @@
 #include "epd_configs.h"
 #include "mem_section.h"
 #include "string.h"
-#if defined(LCD_USING_OPM060D)
+#if defined(LCD_USING_EPD_YZC085_V100) || defined(LCD_USING_EPD_YZC146_V100)
 
 #ifndef EPD_WAVEFORM_USE_BIN
 // 8bit lookup table for the current frame (high 4 bits: old data, low 4 bits: new data).

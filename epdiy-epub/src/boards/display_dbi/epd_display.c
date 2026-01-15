@@ -583,15 +583,8 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
         mode = EPD_DRAW_MODE_PARTIAL;
     }
 
-    if (reflesh_times % PART_DISP_TIMES == 0) {
-        frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_FULL);
-        reflesh_times = 0;
-    } else {
-        frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_PARTIAL);
-    }
-    reflesh_times++;
+    frame_times = epd_wave_table_get_frames(temperature, mode);
 
-    
     CopyToMixedGrayBuffer(hlcdc, RGBCode, Xpos0, Ypos0, Xpos1, Ypos1);
     LOG_I("Convert layer data take=%d(ms) \r\n", rt_tick_get() - start_tick);
 
