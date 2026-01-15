@@ -13,7 +13,34 @@ typedef enum
 } MainOption;
 
 static MainOption main_option = OPTION_OPEN_LIBRARY; // 默认“打开书库”
-static int full_refresh_period = 10; // 全刷周期次数，仅用于设置页显示
+// 全刷周期选项：5、10、20、不刷新(0)
+static const int kFullRefreshOptions[] = {5, 10, 20, 0};
+static const int kFullRefreshOptionsCount = sizeof(kFullRefreshOptions) / sizeof(kFullRefreshOptions[0]);
+static int full_refresh_idx = 1; // 默认10次
+
+// 获取当前全刷周期值
+int screen_get_full_refresh_period() 
+{
+  return kFullRefreshOptions[full_refresh_idx];
+}
+
+// 切换全刷周期（循环）
+void screen_cycle_full_refresh_period() 
+{
+  full_refresh_idx = (full_refresh_idx + 1) % kFullRefreshOptionsCount;   // ？% 4
+}
+
+// 设置全刷周期索引
+void screen_set_full_refresh_idx(int idx) 
+{
+  if (idx >= 0 && idx < kFullRefreshOptionsCount) full_refresh_idx = idx;
+}
+
+// 获取当前全刷周期索引
+int screen_get_full_refresh_idx() 
+{
+  return full_refresh_idx;
+}
 
 // 设置页列表项
 typedef enum { SET_TOUCH = 0, SET_TIMEOUT = 1, SET_FULL_REFRESH = 2, SET_CONFIRM = 3 } SettingsItem;
@@ -254,7 +281,11 @@ static void render_settings_page(Renderer *renderer)
     renderer->draw_rect(item_x, y, item_w, item_h, 0);
   }
   char buf3[64];
-  rt_snprintf(buf3, sizeof(buf3), "全刷周期：%d 次", full_refresh_period);
+  int fr_val = screen_get_full_refresh_period();
+  if (fr_val == 0)
+    rt_snprintf(buf3, sizeof(buf3), "全刷周期：不刷新");
+  else
+    rt_snprintf(buf3, sizeof(buf3), "全刷周期：%d 次", fr_val);
   {
     int t3_w = renderer->get_text_width(buf3);
     int tx = item_x + (item_w - t3_w) / 2;
@@ -342,6 +373,13 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
       {
         // SELECT 在超时关机项上为加操作（循环）
         adjust_timeout(true);
+        render_settings_page(renderer);
+        break;
+      }
+      if (settings_selected_idx == SET_FULL_REFRESH)
+      {
+        // SELECT 在全刷周期项上为加操作（循环）
+        screen_cycle_full_refresh_period();
         render_settings_page(renderer);
         break;
       }
