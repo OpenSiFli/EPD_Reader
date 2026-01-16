@@ -177,11 +177,11 @@ void handleEpub(Renderer *renderer, UIAction action)
       }
       else if (sel == 8) //确认：1.按第六格累积值跳页
       {
-        int delta = reader->overlay_get_jump();
-        if (delta != 0)
-        {
-          reader->jump_pages(delta);
-        }
+        // 跳转到第六格显示的目标页
+        int target = reader->overlay_get_target_page();
+        if (target < 1) target = 1;
+        extern EpubListState epub_list_state;
+        epub_list_state.epub_list[epub_list_state.selected_item].current_page = (uint16_t)(target - 1);
         reader->overlay_reset_jump();
         reader->stop_overlay();
       }
@@ -202,19 +202,19 @@ void handleEpub(Renderer *renderer, UIAction action)
       }
       else if (sel == 3)
       {
-        reader->overlay_add_jump(-5);
+        reader->overlay_adjust_target_page(-5);
       }
       else if (sel == 4) 
       {
-        reader->overlay_add_jump(-1);
+        reader->overlay_adjust_target_page(-1);
       }
       else if (sel == 6)
       {
-        reader->overlay_add_jump(1);
+        reader->overlay_adjust_target_page(1);
       }
       else if (sel == 7) 
       {
-        reader->overlay_add_jump(5);
+        reader->overlay_adjust_target_page(5);
       }
       
     }
@@ -271,15 +271,31 @@ void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_red
   case UP:
     if (toc_bottom_mode)
     {
-      toc_bottom_idx = (toc_bottom_idx + 2) % 3; // 左移
+      // 底部模式下：UP 向左移动；若已在最左（上一页），则返回当前页目录的最后一项
+      if (toc_bottom_idx > 0)
+      {
+        toc_bottom_idx--;
+      }
+      else
+      {
+        int per_page = 6;
+        int start_idx = (epub_index_state.selected_item / per_page) * per_page;
+        int end_idx = start_idx + per_page - 1;
+        int count = contents->get_items_count();
+        if (end_idx >= count) end_idx = count - 1;
+        toc_bottom_mode = false;
+        epub_index_state.selected_item = end_idx;
+      }
     }
     else
     {
+      // 若处于当前页第一个条目，UP 切换到底部按钮模式并选择“下一页”
       int per_page = 6; 
       int start_idx = (epub_index_state.selected_item / per_page) * per_page;
       if (contents->get_items_count() > 0 && epub_index_state.selected_item == start_idx)
       {
         toc_bottom_mode = true;
+        toc_bottom_idx = 2; // 下一页
       }
       else
       {
@@ -290,7 +306,18 @@ void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_red
   case DOWN:
     if (toc_bottom_mode)
     {
-      toc_bottom_idx = (toc_bottom_idx + 1) % 3; // 右移
+      // 底部模式下：DOWN 向右移动；若已在最右（下一页），则返回当前页目录的第一项
+      if (toc_bottom_idx < 2)
+      {
+        toc_bottom_idx++;
+      }
+      else
+      {
+        int per_page = 6;
+        int start_idx = (epub_index_state.selected_item / per_page) * per_page;
+        toc_bottom_mode = false;
+        epub_index_state.selected_item = start_idx;
+      }
     }
     else
     {
@@ -299,9 +326,11 @@ void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_red
       int end_idx = start_idx + per_page - 1;
       int count = contents->get_items_count();
       if (end_idx >= count) end_idx = count - 1;
+      // 若处于当前页最后一个条目，DOWN 切换到底部按钮模式并选择“上一页”
       if (count > 0 && epub_index_state.selected_item == end_idx)
       {
         toc_bottom_mode = true;
+        toc_bottom_idx = 0; // 上一页
       }
       else
       {
@@ -338,7 +367,7 @@ void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_red
           if (epub_index_state.selected_item < 0) epub_index_state.selected_item = 0;
           contents->set_needs_redraw();
         }
-        toc_bottom_mode = false;
+        // 保持底部模式，允许连续翻页
       }
       else if (toc_bottom_idx == 2)
       {
@@ -350,7 +379,7 @@ void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_red
             epub_index_state.selected_item = count - 1;
           contents->set_needs_redraw();
         }
-        toc_bottom_mode = false;
+        // 保持底部模式，允许连续翻页
       }
     }
     else
@@ -403,8 +432,20 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
   case UP:
     if (library_bottom_mode)
     {
-      // UP 表示向左选择
-      library_bottom_idx = (library_bottom_idx + 2) % 3;
+      // 底部模式下：UP 向左移动；若已在最左（上一页），则返回当前页的列表最后一项
+      if (library_bottom_idx > 0)
+      {
+        library_bottom_idx--;
+      }
+      else
+      {
+        int per_page = 4;
+        int start_idx = (epub_list_state.selected_item / per_page) * per_page;
+        int end_idx = start_idx + per_page - 1;
+        if (end_idx >= epub_list_state.num_epubs) end_idx = epub_list_state.num_epubs - 1;
+        library_bottom_mode = false;
+        epub_list_state.selected_item = end_idx;
+      }
     }
     else
     {
@@ -414,6 +455,7 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
       if (epub_list_state.num_epubs > 0 && epub_list_state.selected_item == start_idx)
       {
         library_bottom_mode = true;
+        library_bottom_idx = 2; // 下一页
       }
       else
       {
@@ -424,8 +466,20 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
   case DOWN:
     if (library_bottom_mode)
     {
-      // DOWN 表示向右选择
-      library_bottom_idx = (library_bottom_idx + 1) % 3;
+      // 底部模式下：DOWN 向右移动；若已在最右（下一页），则返回当前页的列表第一项
+      if (library_bottom_idx < 2)
+      {
+        library_bottom_idx++;
+      }
+      else
+      {
+        int per_page = 4; 
+        int start_idx = (epub_list_state.selected_item / per_page) * per_page;
+        int end_idx = start_idx + per_page - 1;
+        if (end_idx >= epub_list_state.num_epubs) end_idx = epub_list_state.num_epubs - 1;
+        library_bottom_mode = false;
+        epub_list_state.selected_item = start_idx;
+      }
     }
     else
     {
@@ -437,6 +491,7 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
       if (epub_list_state.num_epubs > 0 && epub_list_state.selected_item == end_idx)
       {
         library_bottom_mode = true;
+        library_bottom_idx = 0; // 上一页
       }
       else
       {
@@ -466,8 +521,7 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
             if (epub_list_state.selected_item < 0) epub_list_state.selected_item = 0;
             epub_list->set_needs_redraw();
           }
-          // 切回条目选择模式
-          library_bottom_mode = false;
+          
         }
         else if (library_bottom_idx == 2)
         {
@@ -479,8 +533,7 @@ void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw)
               epub_list_state.selected_item = epub_list_state.num_epubs - 1;
             epub_list->set_needs_redraw();
           }
-          // 切回条目选择模式
-          library_bottom_mode = false;
+         
         }
       }
       else

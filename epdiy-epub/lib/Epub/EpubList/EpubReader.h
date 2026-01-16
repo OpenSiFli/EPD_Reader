@@ -17,6 +17,8 @@ private:
   bool overlay_active = false;
   int overlay_selected = 0; // 0..10，共11个
   int overlay_jump_acc = 0; // 覆盖层累积跳页值（可为负）
+  // 覆盖层目标页（当前章节内的页，1-based）
+  int overlay_target_page = 1;
   // 覆盖层中心属性模式：触控开关 或 全刷周期
   enum OverlayCenterMode { CENTER_TOUCH = 0, CENTER_FULL_REFRESH = 1 };
   OverlayCenterMode overlay_center_mode = CENTER_TOUCH;
@@ -38,16 +40,19 @@ public:
   void render();
   void set_state_section(uint16_t current_section);
   // 覆盖层控制
-  void start_overlay() { overlay_active = true; overlay_selected = 0; overlay_jump_acc = 0; }
+  void start_overlay() { overlay_active = true; overlay_selected = 0; overlay_jump_acc = 0; overlay_target_page = state.current_page + 1; }
   void stop_overlay() { overlay_active = false; }
   bool is_overlay_active() const { return overlay_active; }
   void overlay_move_left();
   void overlay_move_right();
   int get_overlay_selected() const { return overlay_selected; }
   // 覆盖层跳页累积控制
-  void overlay_add_jump(int d) { overlay_jump_acc += d; }
   void overlay_reset_jump() { overlay_jump_acc = 0; }
   int overlay_get_jump() const { return overlay_jump_acc; }
+  // 覆盖层目标页控制
+  void overlay_set_target_page(int p);
+  void overlay_adjust_target_page(int d);
+  int overlay_get_target_page() const { return overlay_target_page; }
   // 覆盖层中心属性控制
   void overlay_set_center_mode_touch() { overlay_center_mode = CENTER_TOUCH; }
   void overlay_set_center_mode_full_refresh() { overlay_center_mode = CENTER_FULL_REFRESH; }

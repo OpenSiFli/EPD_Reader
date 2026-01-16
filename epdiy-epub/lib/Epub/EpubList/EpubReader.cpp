@@ -103,6 +103,11 @@ void EpubReader::render()
   {
     parse_and_layout_current_section();
   }
+  // 确保覆盖层目标页初始与当前页同步（1-based）
+  if (overlay_active && overlay_target_page < 1)
+  {
+    overlay_set_target_page(state.current_page + 1);
+  }
   ulog_d(TAG, "rendering page %d of %d", state.current_page, parser->get_page_count());
   parser->render_page(state.current_page, renderer, epub);
   ulog_d(TAG, "rendered page %d of %d", state.current_page, parser->get_page_count());
@@ -178,7 +183,15 @@ void EpubReader::render_overlay()
       case 2: rt_snprintf(label, cap, ">"); break;
       case 3: rt_snprintf(label, cap, "-5"); break;
       case 4: rt_snprintf(label, cap, "-1"); break;
-      case 5: rt_snprintf(label, cap, "%d", overlay_jump_acc); break;
+      // 第六格显示：x/n 页
+      case 5:
+      {
+        int total = state.pages_in_current_section;
+        if (total <= 0 && parser) total = parser->get_page_count();
+        if (total <= 0) total = 1;
+        rt_snprintf(label, cap, "%d/%d", overlay_target_page, total);
+        break;
+      }
       case 6: rt_snprintf(label, cap, "+1"); break;
       case 7: rt_snprintf(label, cap, "+5"); break;
       case 8: rt_snprintf(label, cap, "确认"); break;
@@ -330,4 +343,23 @@ void EpubReader::overlay_cycle_full_refresh()
 int EpubReader::overlay_get_full_refresh_value() const
 {
   return screen_get_full_refresh_period();
+}
+
+void EpubReader::overlay_set_target_page(int p)
+{
+  if (p < 1) p = 1;
+  int maxp = state.pages_in_current_section;
+  if (maxp <= 0 && parser)
+  {
+    maxp = parser->get_page_count();
+  }
+  if (maxp <= 0) maxp = 1;
+  if (p > maxp) p = maxp;
+  overlay_target_page = p;
+}
+
+void EpubReader::overlay_adjust_target_page(int d)
+{
+  int p = overlay_target_page + d;
+  overlay_set_target_page(p);
 }
