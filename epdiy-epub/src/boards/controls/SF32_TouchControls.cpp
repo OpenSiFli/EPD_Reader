@@ -120,21 +120,6 @@ SF32_TouchControls::SF32_TouchControls(Renderer *renderer, ActionCallback_t on_a
 
 void SF32_TouchControls::render(Renderer *renderer)
 {
-  renderer->set_margin_top(0);
-  uint16_t x_offset = 10;
-  uint16_t x_triangle = x_offset + 70;
-  // DOWN
-  renderer->draw_rect(x_offset, 1, ui_button_width, ui_button_height, 0);
-  renderer->draw_triangle(x_triangle, 20, x_triangle - 5, 6, x_triangle + 5, 6, 0);
-  // UP
-  x_offset = ui_button_width + 30;
-  x_triangle = x_offset + 70;
-  renderer->draw_rect(x_offset, 1, ui_button_width, ui_button_height, 0);
-  renderer->draw_triangle(x_triangle, 6, x_triangle - 5, 20, x_triangle + 5, 20, 0);
-  // SELECT
-  x_offset = ui_button_width * 2 + 60;
-  renderer->draw_rect(x_offset, 1, ui_button_width, ui_button_height, 0);
-  renderer->draw_circle(x_offset + (ui_button_width / 2) + 9, 15, 5, 0);
   renderer->set_margin_top(35);
 }
 
@@ -160,49 +145,5 @@ void SF32_TouchControls::powerOnTouch()
 }
 void SF32_TouchControls::renderPressedState(Renderer *renderer, UIAction action, bool state)
 {
-  renderer->set_margin_top(0);
-  switch (action)
-  {
-  case DOWN:
-  {
-    if (state)
-    {
-      renderer->fill_triangle(80, 20, 75, 6, 85, 6, 0);
-    }
-    else
-    {
-      renderer->fill_triangle(81, 19, 76, 7, 86, 7, 255);
-    }
-    //renderer->flush_area(76, 6, 10, 15);
-    break;
-  }
-  case UP:
-  {
-    if (state)
-    {
-      renderer->fill_triangle(220, 6, 220 - 5, 20, 220 + 5, 20, 0);
-    }
-    else
-    {
-      renderer->fill_triangle(221, 7, 221 - 5, 19, 221 + 5, 19, 255);
-    }
-    //renderer->flush_area(195, 225, 10, 15);
-  }
-  break;
-  case SELECT:
-  {
-    uint16_t x_circle = (ui_button_width * 2 + 60) + (ui_button_width / 2) + 9;
-    renderer->fill_circle(x_circle, 15, 5, 0);
-    //renderer->flush_area(x_circle - 3, 12, 6, 6);
-    // TODO - this causes a stack overflow when select is picked
-    // renderPressedState(renderer, last_action, false);
-  }
-  break;
-  case LAST_INTERACTION:
-  case NONE:
-    break;
-  default:
-    break;
-  }
   renderer->set_margin_top(35);
 }

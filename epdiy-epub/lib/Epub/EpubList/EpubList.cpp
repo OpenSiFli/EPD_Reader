@@ -193,12 +193,27 @@ void EpubList::render()
         renderer->draw_rect(i, ypos + PADDING / 2 + i, renderer->get_page_width() - 2 * i, cell_height - PADDING - 2 * i, 255);
       }
     }
-    // draw the selection box around the current selection
-    if (state.selected_item == i)
+    // 当不处于底部按钮选择模式时，绘制列表高亮
+    // 若处于底部模式，则擦除列表高亮，避免同时双高亮
+    if (!m_bottom_mode)
     {
-      for (int i = 0; i < 5; i++)
+      if (state.selected_item == i)
       {
-        renderer->draw_rect(i, ypos + PADDING / 2 + i, renderer->get_page_width() - 2 * i, cell_height - PADDING - 2 * i, 0);
+        for (int line = 0; line < 5; line++)
+        {
+          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 0);
+        }
+      }
+    }
+    else
+    {
+      if (state.selected_item == i)
+      {
+        // 擦除之前的黑色高亮边框
+        for (int line = 0; line < 5; line++)
+        {
+          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 255);
+        }
       }
     }
     ypos += cell_height;

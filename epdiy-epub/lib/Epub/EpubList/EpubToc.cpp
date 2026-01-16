@@ -108,12 +108,25 @@ void EpubToc::render()
         renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 255);
       }
     }
-    // draw the selection box around the current selection
-    if (state.selected_item == i)
+    // 目录页：仅在非底部按钮模式时显示列表高亮；底部模式下擦除列表高亮
+    if (!m_bottom_mode)
     {
-      for (int line = 0; line < 3; line++)
+      if (state.selected_item == i)
       {
-        renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 0);
+        for (int line = 0; line < 3; line++)
+        {
+          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 0);
+        }
+      }
+    }
+    else
+    {
+      if (state.selected_item == i)
+      {
+        for (int line = 0; line < 3; line++)
+        {
+          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 255);
+        }
       }
     }
     ypos += cell_height;
