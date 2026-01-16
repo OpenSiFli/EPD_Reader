@@ -112,6 +112,21 @@ void EpubReader::render()
   parser->render_page(state.current_page, renderer, epub);
   ulog_d(TAG, "rendered page %d of %d", state.current_page, parser->get_page_count());
   ulog_d(TAG, "after render: %d", heap_free_size());
+  // 章节进度
+  if (state.pages_in_current_section > 0) 
+  {
+    char buf[32];
+    rt_snprintf(buf, sizeof(buf), "%d页/%d页", state.current_page + 1, state.pages_in_current_section);
+    int page_w = renderer->get_page_width();
+    int page_h = renderer->get_page_height();
+    int text_w = renderer->get_text_width(buf);
+    int text_h = renderer->get_line_height();
+    int x = (page_w - text_w) / 2;
+    int reserved_bottom = renderer->get_line_height() + 4; 
+    const int progress_up = 6; // 上抬
+    int y = page_h - text_h - 10 + reserved_bottom - progress_up;
+    renderer->draw_text(x, y, buf, false, true);
+  }
   // 绘制半屏覆盖操作层
   if (overlay_active)
   {

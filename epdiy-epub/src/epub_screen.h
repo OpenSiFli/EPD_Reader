@@ -11,7 +11,7 @@
 void screen_init(int default_timeout_hours);
 
 // 获取当前关机超时设置（小时；0 表示不关机）
-int screen_get_timeout_shutdown_hours();
+int screen_get_timeout_shutdown_minutes();
 
 // 获取当前主页面选中的选项（0: 打开书库, 1: 继续阅读, 2: 进入设置）
 int screen_get_main_selected_option();

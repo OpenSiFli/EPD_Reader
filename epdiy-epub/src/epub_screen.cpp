@@ -1,3 +1,5 @@
+
+#include "EpubList/EpubList.h"
 #include "epub_screen.h"
 #include <string.h>
 
@@ -7,6 +9,9 @@ extern "C"
 {
   extern void set_part_disp_times(int val);
 }
+
+// 最近一次真实打开并阅读的书本索引（由 main.cpp 维护）
+extern int g_last_read_index;
 
 // 主页面选项
 typedef enum 
@@ -50,24 +55,24 @@ int screen_get_full_refresh_idx()
 typedef enum { SET_TOUCH = 0, SET_TIMEOUT = 1, SET_FULL_REFRESH = 2, SET_CONFIRM = 3 } SettingsItem;
 static int settings_selected_idx = 0;
 
-// 超时关机：1/3/5/7/10/不关机(0)
-static const int kTimeoutOptions[] = {1, 3, 5, 7, 10, 0};
+// 超时关机：5/10/30分钟、1小时、不关机(0)
+static const int kTimeoutOptions[] = {5, 10, 30, 60, 0}; // 单位：分钟，0为不关机
 static const int kTimeoutOptionsCount = sizeof(kTimeoutOptions) / sizeof(kTimeoutOptions[0]);
-static int timeout_shutdown_hours = 5; // 运行时关机超时（小时），0 表示不关机
-static int timeout_idx = -1; // 指向 kTimeoutOptions 的索引
+static int timeout_shutdown_minutes = 30; // 默认30分钟
+static int timeout_idx = -1; // 
 
-static int find_timeout_idx(int hours)
+static int find_timeout_idx(int minutes)
 {
   for (int i = 0; i < kTimeoutOptionsCount; ++i)
   {
-    if (kTimeoutOptions[i] == hours) return i;
+    if (kTimeoutOptions[i] == minutes) return i;
   }
-  return 2; // 默认索引：5小时
+  return 2; // 默认索引：30分钟
 }
 
 static void adjust_timeout(bool increase)
 {
-  if (timeout_idx < 0) timeout_idx = find_timeout_idx(timeout_shutdown_hours);
+  if (timeout_idx < 0) timeout_idx = find_timeout_idx(timeout_shutdown_minutes);
   if (increase)
   {
     timeout_idx = (timeout_idx + 1) % kTimeoutOptionsCount;
@@ -76,19 +81,19 @@ static void adjust_timeout(bool increase)
   {
     timeout_idx = (timeout_idx - 1 + kTimeoutOptionsCount) % kTimeoutOptionsCount;
   }
-  timeout_shutdown_hours = kTimeoutOptions[timeout_idx];
+  timeout_shutdown_minutes = kTimeoutOptions[timeout_idx];
 }
 
-void screen_init(int default_timeout_hours)
+void screen_init(int default_timeout_minutes)
 {
-  timeout_shutdown_hours = default_timeout_hours;
-  timeout_idx = find_timeout_idx(timeout_shutdown_hours);
+  timeout_shutdown_minutes = default_timeout_minutes;
+  timeout_idx = find_timeout_idx(timeout_shutdown_minutes);
 }
 
-int screen_get_timeout_shutdown_hours()
+int screen_get_timeout_shutdown_minutes()
 {
-  if (timeout_idx < 0) timeout_idx = find_timeout_idx(timeout_shutdown_hours);
-  return timeout_shutdown_hours;
+  if (timeout_idx < 0) timeout_idx = find_timeout_idx(timeout_shutdown_minutes);
+  return timeout_shutdown_minutes;
 }
 
 int screen_get_main_selected_option()
@@ -133,10 +138,14 @@ static void render_main_page(Renderer *renderer)
   int mid_w = right_x - margin_side - mid_x;
 
   const char *opt_text = NULL;
+  extern EpubListState epub_list_state;
+  bool has_continue_reading = (epub_list_state.num_epubs > 0 && g_last_read_index >= 0 && g_last_read_index < epub_list_state.num_epubs);
   switch (main_option)
   {
     case OPTION_OPEN_LIBRARY:     opt_text = "打开书库"; break;
-    case OPTION_CONTINUE_READING: opt_text = "继续阅读"; break;
+    case OPTION_CONTINUE_READING:
+      opt_text = has_continue_reading ? "继续阅读" : "无阅读记录";
+      break;
     case OPTION_ENTER_SETTINGS:   opt_text = "进入设置"; break;
   }
   int opt_w = renderer->get_text_width(opt_text);
@@ -208,6 +217,7 @@ static void render_settings_page(Renderer *renderer)
   // 1) 触控开关
   int item_w = page_w - margin_lr * 2 - arrow_col_w * 2; // 为左右箭头列留边
   int item_x = margin_lr + arrow_col_w;
+  if (settings_selected_idx == SET_TOUCH)
   {
     const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
     renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
@@ -237,6 +247,7 @@ static void render_settings_page(Renderer *renderer)
   y += item_h + gap;
 
   // 2) 超时关机
+  if (settings_selected_idx == SET_TIMEOUT)
   {
     const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
     renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
@@ -252,13 +263,17 @@ static void render_settings_page(Renderer *renderer)
     renderer->draw_rect(item_x, y, item_w, item_h, 0);
   }
   char buf2[64];
-  if (timeout_shutdown_hours == 0)
+  if (timeout_shutdown_minutes == 0)
   {
     rt_snprintf(buf2, sizeof(buf2), "超时关机：不关机");
   }
+  else if (timeout_shutdown_minutes < 60)
+  {
+    rt_snprintf(buf2, sizeof(buf2), "超时关机：%d分钟", timeout_shutdown_minutes);
+  }
   else
   {
-    rt_snprintf(buf2, sizeof(buf2), "超时关机：%d 小时", timeout_shutdown_hours);
+    rt_snprintf(buf2, sizeof(buf2), "超时关机：%d小时", timeout_shutdown_minutes / 60);
   }
   {
     int t2_w = renderer->get_text_width(buf2);
@@ -270,6 +285,7 @@ static void render_settings_page(Renderer *renderer)
   y += item_h + gap;
 
   // 3) 全刷周期
+  if (settings_selected_idx == SET_FULL_REFRESH)
   {
     const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
     renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
