@@ -22,6 +22,6 @@ void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw);
 // 设置页面交互与渲染；返回 true 表示确认并退出到主页面
 bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw);
 // 切换全刷周期（循环）
-void screen_cycle_full_refresh_period();
+void screen_cycle_full_refresh_period(bool refresh);
 // 获取当前全刷周期值
 int screen_get_full_refresh_period();

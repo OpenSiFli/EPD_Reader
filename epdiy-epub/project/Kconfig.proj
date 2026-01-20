@@ -51,7 +51,9 @@ if !BSP_USING_BUILT_LCD
 	config TSC_USING_GT967
 		bool
 		default n
-
+	config TSC_USING_GT967
+		bool
+		default n
 	choice
 		prompt "Custom LCD driver"
 		default LCD_USING_EPD_YZC085_V100 if BSP_USING_BOARD_SF32_OED_EPD_V11

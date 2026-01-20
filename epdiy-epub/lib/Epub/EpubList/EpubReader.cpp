@@ -337,7 +337,7 @@ void EpubReader::jump_pages(int delta)
 
 void EpubReader::overlay_cycle_full_refresh()
 {
-  screen_cycle_full_refresh_period();
+  screen_cycle_full_refresh_period(true);
 }
 
 int EpubReader::overlay_get_full_refresh_value() const
