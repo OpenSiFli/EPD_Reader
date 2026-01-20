@@ -36,6 +36,15 @@ void EpubList::prev()
     state.selected_item--;
 }
 
+void EpubList::switch_book(int target_index)
+{
+  if (state.num_epubs == 0) return;
+  if (target_index < 0 || target_index >= state.num_epubs)
+    return;
+  state.selected_item = target_index;
+}
+
+
 bool EpubList::load(const char *path)
 {
   if (state.is_loaded)

@@ -8,7 +8,7 @@ class Renderer;
 class TouchControls
 {
 protected:
-  bool touch_enable = false;
+  bool touch_enable = 1;
 
 public:
   TouchControls(){};

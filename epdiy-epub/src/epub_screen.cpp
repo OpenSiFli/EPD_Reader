@@ -2,7 +2,7 @@
 #include "EpubList/EpubList.h"
 #include "epub_screen.h"
 #include <string.h>
-
+#include "type.h"
 
 extern TouchControls *touch_controls;
 extern "C" 
@@ -16,9 +16,9 @@ extern int g_last_read_index;
 // 主页面选项
 typedef enum 
 {
-  OPTION_OPEN_LIBRARY = 0,
-  OPTION_CONTINUE_READING,
-  OPTION_ENTER_SETTINGS
+  OPTION_OPEN_LIBRARY = 0,  // 打开书库
+  OPTION_CONTINUE_READING,  // 继续阅读
+  OPTION_ENTER_SETTINGS     // 进入设置
 } MainOption;
 
 static MainOption main_option = OPTION_OPEN_LIBRARY; // 默认“打开书库”
@@ -34,9 +34,18 @@ int screen_get_full_refresh_period()
 }
 
 // 切换全刷周期（循环）
-void screen_cycle_full_refresh_period() 
+void screen_cycle_full_refresh_period(bool refresh) 
 {
-  full_refresh_idx = (full_refresh_idx + 1) % kFullRefreshOptionsCount;   // ？% 4
+  if(refresh)
+  {
+    full_refresh_idx = (full_refresh_idx + 1) % kFullRefreshOptionsCount;   // ？% 4
+
+  }
+  else
+  {
+    full_refresh_idx = (full_refresh_idx - 1) % kFullRefreshOptionsCount;   // ？% 4
+
+  }
 }
 
 // 设置全刷周期索引
@@ -51,9 +60,8 @@ int screen_get_full_refresh_idx()
   return full_refresh_idx;
 }
 
-// 设置页列表项
-typedef enum { SET_TOUCH = 0, SET_TIMEOUT = 1, SET_FULL_REFRESH = 2, SET_CONFIRM = 3 } SettingsItem;
-static int settings_selected_idx = 0;
+
+int settings_selected_idx = 0;
 
 // 超时关机：5/10/30分钟、1小时、不关机(0)
 static const int kTimeoutOptions[] = {5, 10, 30, 60, 0}; // 单位：分钟，0为不关机
@@ -79,7 +87,7 @@ static void adjust_timeout(bool increase)
   }
   else
   {
-    timeout_idx = (timeout_idx - 1 + kTimeoutOptionsCount) % kTimeoutOptionsCount;
+    timeout_idx = (timeout_idx - 1) % kTimeoutOptionsCount;
   }
   timeout_shutdown_minutes = kTimeoutOptions[timeout_idx];
 }
@@ -101,7 +109,7 @@ int screen_get_main_selected_option()
   return (int)main_option; // 0: 打开书库, 1: 继续阅读, 2: 进入设置
 }
 
-// 主页面
+// 绘制主页面
 static void render_main_page(Renderer *renderer)
 {
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 255);
@@ -152,12 +160,12 @@ static void render_main_page(Renderer *renderer)
   int opt_h = renderer->get_line_height();
   renderer->draw_text(mid_x + (mid_w - opt_w) / 2, y + (rect_h - opt_h) / 2, opt_text, false, true);
 }
-
+//主界面处理
 void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw)
 {
   if (needs_redraw || action == NONE)
   {
-    render_main_page(renderer);
+    render_main_page(renderer);//绘制主界面
     return;
   }
   switch (action)
@@ -195,7 +203,7 @@ void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw)
 }
 
 // 设置页面
-static void render_settings_page(Renderer *renderer)
+void render_settings_page(Renderer *renderer)
 {
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 255);
 
@@ -334,6 +342,7 @@ static void render_settings_page(Renderer *renderer)
   renderer->draw_text(confirm_x + (confirm_w - c_w) / 2, confirm_y + (confirm_h - c_h) / 2, confirm, false, true);
 }
 
+// 设置页面交互处理
 bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
 {
   // 读取并清除一次性的触控箭头标记，避免后续硬件按键误用
@@ -376,6 +385,56 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
         render_settings_page(renderer);
       }
       break;
+    case SELECT_BOX:
+      if(settings_selected_idx == SET_TOUCH)
+      {
+        render_settings_page(renderer);
+      }
+      else if(settings_selected_idx == SET_TIMEOUT)
+      {
+        render_settings_page(renderer);
+      }
+      else if(settings_selected_idx == SET_FULL_REFRESH)
+      {
+        render_settings_page(renderer);
+      }
+      else if(settings_selected_idx == SET_CONFIRM)
+      {
+        render_settings_page(renderer);
+        return true;
+      }
+      break;
+    case PREV_OPTION:
+      if (settings_selected_idx == SET_TIMEOUT)
+      {
+        // SELECT 在超时关机项上为加操作（循环）
+        adjust_timeout(false);
+        render_settings_page(renderer);
+      }
+      else if(settings_selected_idx == SET_FULL_REFRESH)
+      {
+       
+        screen_cycle_full_refresh_period(false);
+        set_part_disp_times(screen_get_full_refresh_period());
+        render_settings_page(renderer);
+      }
+    
+      break;
+    case NEXT_OPTION:
+      if (settings_selected_idx == SET_TIMEOUT)
+      {
+        // SELECT 在超时关机项上为加操作（循环）
+        adjust_timeout(true);
+        render_settings_page(renderer);
+      }
+      else if(settings_selected_idx == SET_FULL_REFRESH)
+      {
+       
+        screen_cycle_full_refresh_period(true);
+        set_part_disp_times(screen_get_full_refresh_period());
+        render_settings_page(renderer);
+      }  
+      break;
     case SELECT:
       if (settings_selected_idx == SET_TOUCH)
       {
@@ -399,7 +458,7 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
       if (settings_selected_idx == SET_FULL_REFRESH)
       {
         // SELECT 在全刷周期项上为加操作（循环）
-        screen_cycle_full_refresh_period();
+        screen_cycle_full_refresh_period(true);
         set_part_disp_times(screen_get_full_refresh_period());
         render_settings_page(renderer);
         break;

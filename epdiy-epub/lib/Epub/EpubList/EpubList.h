@@ -47,4 +47,5 @@ public:
   void next();
   void prev();
   void render();
+  void switch_book(int target_index);
 };

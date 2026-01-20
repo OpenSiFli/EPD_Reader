@@ -31,6 +31,15 @@ void EpubToc::prev()
   }
   state.selected_item = (state.selected_item - 1 + epub->get_toc_items_count()) % epub->get_toc_items_count();
 }
+void EpubToc::switch_book(int target_index)
+{
+  if (!epub)
+  {
+    load();
+  }
+  state.selected_item = target_index % epub->get_toc_items_count();
+
+}
 
 bool EpubToc::load()
 {

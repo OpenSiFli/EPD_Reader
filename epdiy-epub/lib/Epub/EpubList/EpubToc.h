@@ -43,6 +43,7 @@ public:
   void next();
   void prev();
   void render();
+  void switch_book(int target_index);
   void set_needs_redraw() { m_needs_redraw = true; }
   uint16_t get_selected_toc();
   // 目录项总数
