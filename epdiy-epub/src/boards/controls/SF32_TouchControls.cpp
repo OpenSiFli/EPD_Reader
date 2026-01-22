@@ -27,6 +27,8 @@ static bool waiting_for_confirmation = false;  // 是否正在等待确认
 extern int touch_sel;
 extern EpubReader *reader;
 
+static const int SWIPE_THRESHOLD = 100;  // 最小滑动距离阈值
+static bool is_touch_started = false;  // 全局或类成员变量
 
 rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 {
