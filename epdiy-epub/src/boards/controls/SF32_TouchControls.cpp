@@ -26,12 +26,15 @@ static bool waiting_for_confirmation = false;  // 是否正在等待确认
 extern int touch_sel;
 extern EpubReader *reader;
 
+static const int SWIPE_THRESHOLD = 100;  // 最小滑动距离阈值
+static bool is_touch_started = false;  // 全局或类成员变量
 
 rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 {
     SF32_TouchControls *instance = static_cast<SF32_TouchControls*> (dev->user_data);
     struct touch_message touch_data;
     rt_uint16_t x,y;
+    int i  = 0;//用于记录第一次按下的情况
 
     /*Read touch point data*/
     rt_device_read(dev, 0, &touch_data, 1);
@@ -50,48 +53,50 @@ rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
         rt_kprintf("Touch down [%d,%d]\r\n", x, y);
         
         // 记录按下时的位置
-        instance->touch_start_x = x;
-        instance->touch_start_y = y;
+        if (!is_touch_started)  // 只允许第一次触发
+        {
+            instance->touch_start_y = y;
+            rt_kprintf("Touch start\r\n");
+            is_touch_started = true;
+        }
         
         instance->is_touch_down = true;
-        
+        instance->touch_current_y = 0;
         // 处理其他触控逻辑...
     }
     else
     {
         rt_kprintf("Touch up [%d,%d]\r\n", x, y);
-        instance->touch_current_x = x;
         instance->touch_current_y = y;
         
         // 检查是否构成向上滑动手势
-        if (instance->is_touch_down) {
-            int y_diff = instance->touch_start_y - touch_data.y;  // 注意坐标转换
-            int x_diff = abs(instance->touch_start_x - touch_data.x);
-            rt_kprintf("Touch up diff Y: %d, X: %d\r\n", y_diff, x_diff);
+        if (instance->is_touch_down) 
+        {
+            int y_diff = instance->touch_start_y - instance->touch_current_y;  // 注意坐标转换
+            rt_kprintf("Touch up diff Y: %d\r\n", y_diff);
             
-            // 检查时间间隔，防止连续触发
-            rt_tick_t current_time = rt_tick_get();
             if(reader->is_overlay_active() == false)
             {
-                if (y_diff > instance->SWIPE_THRESHOLD && y_diff > abs(x_diff)) 
+                if (y_diff > SWIPE_THRESHOLD) 
                 {
                     rt_kprintf("Up swipe detected! Diff: %d\n", y_diff);
                     
                     // 发送向上滑动动作
                     UIAction action = UPGLIDE;
                     instance->last_action = action;
-                    instance->on_action(action);
-                   
+                    instance->on_action(action);               
                                         
-                    // 重置状态
-                    instance->is_touch_down = false;
-                    return RT_EOK;
                 }
             }
+            
+             
         }
         
+        // 清空坐标值，避免下次误用
+        instance->touch_start_y = 0;
         // 重置触摸状态
         instance->is_touch_down = false;
+        is_touch_started = false;
     }
 
   // 只处理按下事件，忽略释放事件
