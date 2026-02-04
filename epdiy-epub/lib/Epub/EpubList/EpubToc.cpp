@@ -1,4 +1,5 @@
 #include "EpubToc.h"
+#include "UIRegionsManager.h"
 
 static const char *TAG = "PUBINDEX";
 #define PADDING 14
@@ -66,6 +67,7 @@ bool EpubToc::load()
 // required as we're not rendering thumbnails
 void EpubToc::render()
 {
+  // 初始化固定区域（仅首次调用）
   ulog_d(TAG, "Rendering EPUB index");
   // what page are we on?
   int current_page = state.selected_item / ITEMS_PER_PAGE;
@@ -75,6 +77,7 @@ void EpubToc::render()
   int cell_height = (renderer->get_page_height() - bottom_area_height - bottom_margin) / ITEMS_PER_PAGE;
   int start_index = current_page * ITEMS_PER_PAGE;
   int ypos = 0;
+
   // starting a fresh page or rendering from scratch?
   ulog_i(TAG, "Current page is %d, previous page %d, redraw=%d", current_page, state.previous_rendered_page, m_needs_redraw);
   if (current_page != state.previous_rendered_page || m_needs_redraw)
@@ -108,6 +111,16 @@ void EpubToc::render()
       }
       // clean up the temporary index block
       delete title_block;
+      // 计算整体区域范围并写入
+      int area_start_x = 0;
+      int area_start_y = ypos + PADDING / 2;
+      int area_end_x = renderer->get_page_width();
+      int area_end_y = ypos + cell_height - PADDING / 2;
+
+        if ((i % ITEMS_PER_PAGE) < ITEMS_PER_PAGE)
+        {
+            static_add_area(area_start_x, area_start_y, area_end_x - area_start_x, area_end_y - area_start_y, (i % ITEMS_PER_PAGE));
+        }
     }
     // clear the selection box around the previous selected item
     if (state.previous_selected_item == i)
@@ -155,7 +168,7 @@ void EpubToc::render()
   int btn_h = 80;
   int btn_y = area_y + (bottom_area_height - btn_h) / 2;
   int btn_x0 = btn_gap;                    // 上一页
-  int btn_x1 = btn_gap * 2 + btn_w;        // 主页面
+  int btn_x1 = btn_gap * 2 + btn_w;        // 书库
   int btn_x2 = btn_gap * 3 + btn_w * 2;    // 下一页
 
   auto draw_button = [&](int x, const char* text, bool selected)
@@ -181,8 +194,25 @@ void EpubToc::render()
   };
 
   draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
+  int start_up_page_x = btn_x0;
+  int start_up_page_y = btn_y + btn_gap * 2;
+  int end_up_page_x = btn_w;
+  int end_up_page_y = btn_h;
+  int start_page_x = btn_x0;
+  static_add_area(start_up_page_x, start_up_page_y, end_up_page_x, end_up_page_y, 6);
+
   draw_button(btn_x1, "书库", m_bottom_mode && m_bottom_idx == 1);
+  int start_main_page_x = btn_x1;
+  int start_main_page_y = btn_y + btn_gap *2;
+  int end_main_page_x = btn_w;
+  int end_main_page_y = btn_h;
+  static_add_area(start_main_page_x, start_main_page_y, end_main_page_x, end_main_page_y, 7);
   draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
+  int start_down_page_x = btn_x2;
+  int start_down_page_y = btn_y + btn_gap *2;
+  int end_down_page_x = btn_w;
+  int end_down_page_y = btn_h;
+  static_add_area(start_down_page_x, start_down_page_y, end_down_page_x, end_down_page_y, 8);
 }
 
 uint16_t EpubToc::get_selected_toc()

@@ -5,6 +5,7 @@
 #include "type.h"
 #include "epub_screen.h"
 #include "EpubReader.h"
+#include "UIRegionsManager.h"
 #ifdef BSP_USING_TOUCHD
     #include "drv_touch.h"
 #endif
@@ -29,6 +30,7 @@ extern EpubReader *reader;
 static const int SWIPE_THRESHOLD = 100;  // 最小滑动距离阈值
 static bool is_touch_started = false;  // 全局或类成员变量
 
+extern AreaRect g_area_array[];
 rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 {
     SF32_TouchControls *instance = static_cast<SF32_TouchControls*> (dev->user_data);
@@ -110,17 +112,17 @@ rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
 switch (ui_state)
 {
   case MAIN_PAGE://主页面
-    if (x >= 10 && x <= 80 && y >= 950 && y <= 1000)
+    if (x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y)
     {
       rt_kprintf("Touch left < \n");
       action = UP;  // 对应 KEY3 功能
     }
-    else if (x >= 650 && x <= 750 && y >= 950 && y <= 1000)
+    else if (x >= g_area_array[1].start_x && x <= g_area_array[1].end_x && y >= g_area_array[1].start_y && y <= g_area_array[1].end_y)
     {
       action = DOWN;  // 对应 KEY1 功能
       rt_kprintf("Touch right > \n");
     }
-    else if (x >= 250 && x <= 500 && y >= 950 && y <= 1000)
+    else if (x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y)
     {
       action = SELECT;  // 对应 KEY2 功能
       rt_kprintf("Touch middle SELECT \n");
@@ -128,19 +130,19 @@ switch (ui_state)
     break;
   case SELECTING_EPUB://书库页面
       // 检查是否点击了功能控制按钮
-    if(x >= 10 && x <= 250 && y >= 920 && y <= 1010)
+    if(x >= g_area_array[4].start_x && x <= g_area_array[4].end_x && y >= g_area_array[4].start_y && y <= g_area_array[4].end_y)
     {
         library_bottom_mode = true;
         library_bottom_idx = 0;
         action = SELECT;
     }
-    else if(x >= 280 && x <= 500 && y >= 920 && y <= 1010)
+    else if(x >= g_area_array[5].start_x && x <= g_area_array[5].end_x && y >= g_area_array[5].start_y && y <= g_area_array[5].end_y)
     {
         library_bottom_mode = true;
         library_bottom_idx = 1;
         action = SELECT;
     }
-    else if(x >= 520 && x <= 750 && y >= 920 && y <= 1010)
+    else if(x >= g_area_array[6].start_x && x <= g_area_array[6].end_x && y >= g_area_array[6].start_y && y <= g_area_array[6].end_y)
     {
         library_bottom_mode = true;
         library_bottom_idx = 2;
@@ -151,19 +153,19 @@ switch (ui_state)
         // 处理书籍选择区域
         int clicked_book_index = -1;
         
-        if(x >= 10 && x <= 740 && y >= 60 && y <= 240)
+        if(x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y)
         {
             clicked_book_index = 0;
         }
-        else if(x >= 10 && x <= 740 && y >= 270 && y <= 450)
+        else if(x >= g_area_array[1].start_x && x <= g_area_array[1].end_x && y >= g_area_array[1].start_y && y <= g_area_array[1].end_y)
         {
             clicked_book_index = 1;
         }
-        else if(x >= 10 && x <= 740 && y >= 470 && y <= 680)
+        else if(x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y)
         {
             clicked_book_index = 2;
         }
-        else if(x >= 10 && x <= 740 && y >= 700 && y <= 900)
+        else if(x >= g_area_array[3].start_x && x <= g_area_array[3].end_x && y >= g_area_array[3].start_y && y <= g_area_array[3].end_y)
         {
             clicked_book_index = 3;
         }
@@ -212,57 +214,57 @@ switch (ui_state)
         touch_sel = 8;
         action = SELECT;
     }
-    
+
     //阅读页面控制区域设置
-    if(x >= 10 && x <= 250 && y >= 900 && y <= 960 && reader->is_overlay_active())
+    if(x >= g_area_array[8].start_x && x <= g_area_array[8].end_x && y >= g_area_array[8].start_y && y <= g_area_array[8].end_y && reader->is_overlay_active())//第三层
     {
         touch_sel = 8;
         action = SELECT;
     }
-    else if(x >= 280 && x <= 480 && y >= 900 && y <= 960 && reader->is_overlay_active())
+    else if(x >= g_area_array[9].start_x && x <= g_area_array[9].end_x && y >= g_area_array[9].start_y && y <= g_area_array[9].end_y && reader->is_overlay_active())
     {
         touch_sel = 9;
         action = SELECT;
     }
-    else if(x >= 520 && x <= 750 && y >= 900 && y <= 960 && reader->is_overlay_active())
+    else if(x >= g_area_array[10].start_x && x <= g_area_array[10].end_x && y >= g_area_array[10].start_y && y <= g_area_array[10].end_y && reader->is_overlay_active())
     {
         touch_sel = 10;
         action = SELECT;
     }
-    else if(x >= 10 && x <= 150 && y >= 690 && y <= 750 && reader->is_overlay_active())
+    else if(x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y && reader->is_overlay_active())//第一层
     {
         touch_sel= 0;
         rt_kprintf("Touch middle SELECT %d\n",touch_sel);
         action = SELECT;
     }
-    else if(x >= 170 && x <= 570 && y >= 690 && y <= 750 && reader->is_overlay_active())
+    else if(x >= g_area_array[1].start_x && x <= g_area_array[1].end_x && y >= g_area_array[1].start_y && y <= g_area_array[1].end_y && reader->is_overlay_active())
     {
         touch_sel= 1;
         rt_kprintf("Touch middle SELECT %d\n",touch_sel);
         action = SELECT;
     }
-    else if(x >= 610 && x <= 750 && y >= 690 && y <= 750 && reader->is_overlay_active())
+    else if(x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y && reader->is_overlay_active())
     {
         touch_sel= 2;
         rt_kprintf("Touch middle SELECT %d\n",touch_sel);
         action = SELECT;
     }
-    else if(x >= 10 && x <= 140 && y >= 790 && y <= 850 && reader->is_overlay_active())
+    else if(x >= g_area_array[3].start_x && x <= g_area_array[3].end_x && y >= g_area_array[3].start_y && y <= g_area_array[3].end_y && reader->is_overlay_active())
     {
         touch_sel = 3;//跳转-5页
         action = SELECT;
     }
-    else if(x >= 165 && x <=300  && y >= 790 && y <= 850 && reader->is_overlay_active())
+    else if(x >= g_area_array[4].start_x && x <= g_area_array[4].end_x && y >= g_area_array[4].start_y && y <= g_area_array[4].end_y && reader->is_overlay_active())
     {
         touch_sel = 4;//跳转-1页
         action = SELECT;
     }
-    else if(x >= 480 && x <= 570 && y >= 790 && y <= 850 && reader->is_overlay_active())
+    else if(x >= g_area_array[6].start_x && x <= g_area_array[6].end_x && y >= g_area_array[6].start_y && y <= g_area_array[6].end_y && reader->is_overlay_active())
     {
         touch_sel = 6;//跳转+1页
         action = SELECT;
     }
-    else if(x >= 620 && x <= 750 && y >= 790 && y <= 850 && reader->is_overlay_active())
+    else if(x >= g_area_array[7].start_x && x <= g_area_array[7].end_x && y >= g_area_array[7].start_y && y <= g_area_array[7].end_y && reader->is_overlay_active())
     {
         touch_sel = 7;//跳转5页
         action = SELECT;
@@ -270,19 +272,31 @@ switch (ui_state)
     
     break;
   case SELECTING_TABLE_CONTENTS: //目录界面
-    if(x >= 10 && x <= 250 && y >= 920 && y <= 1010)
+    rt_kprintf("g_area_array[0].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[0].start_x ,g_area_array[0].end_x ,g_area_array[0].start_y ,g_area_array[0].end_y);
+    rt_kprintf("g_area_array[1].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[1].start_x ,g_area_array[1].end_x ,g_area_array[1].start_y ,g_area_array[1].end_y);
+    rt_kprintf("g_area_array[2].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[2].start_x ,g_area_array[2].end_x ,g_area_array[2].start_y ,g_area_array[2].end_y);
+    rt_kprintf("g_area_array[3].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[3].start_x ,g_area_array[3].end_x ,g_area_array[3].start_y ,g_area_array[3].end_y);
+    rt_kprintf("g_area_array[4].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[4].start_x ,g_area_array[4].end_x ,g_area_array[4].start_y ,g_area_array[4].end_y);
+    rt_kprintf("g_area_array[5].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[5].start_x ,g_area_array[5].end_x ,g_area_array[5].start_y ,g_area_array[5].end_y);
+    rt_kprintf("g_area_array[6].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[6].start_x ,g_area_array[6].end_x ,g_area_array[6].start_y ,g_area_array[6].end_y);
+    rt_kprintf("g_area_array[7].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[7].start_x ,g_area_array[7].end_x ,g_area_array[7].start_y ,g_area_array[7].end_y);
+    rt_kprintf("g_area_array[8].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[8].start_x ,g_area_array[8].end_x ,g_area_array[8].start_y ,g_area_array[8].end_y);
+    rt_kprintf("g_area_array[9].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[9].start_x ,g_area_array[9].end_x ,g_area_array[9].start_y ,g_area_array[9].end_y);
+    rt_kprintf("g_area_array[10].start_x %d end_x %d start_y %d end_y %d\n",g_area_array[10].start_x ,g_area_array[10].end_x ,g_area_array[10].start_y ,g_area_array[10].end_y);
+
+    if(x >= g_area_array[6].start_x && x <= g_area_array[6].end_x && y >= g_area_array[6].start_y && y <= g_area_array[6].end_y)
     {
         toc_bottom_mode = true;
         toc_bottom_idx = 0;
         action = SELECT;
     }
-    else if(x >= 280 && x <= 500 && y >= 920 && y <= 1010)
+    else if(x >= g_area_array[7].start_x && x <= g_area_array[7].end_x && y >= g_area_array[7].start_y && y <= g_area_array[7].end_y)
     {
         toc_bottom_mode = true;
         toc_bottom_idx = 1;
         action = SELECT;
     }
-    else if(x >= 520 && x <= 750 && y >= 920 && y <= 1010)
+    else if(x >= g_area_array[8].start_x && x <= g_area_array[8].end_x && y >= g_area_array[8].start_y && y <= g_area_array[8].end_y)
     {
         toc_bottom_mode = true;
         toc_bottom_idx = 2;
@@ -292,27 +306,27 @@ switch (ui_state)
     {
         int clicked_toc_index = -1;
 
-        if(x >= 10 && x <= 750 && y >= 20 && y <= 170)
+        if(x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y)
         {
           clicked_toc_index = 0;
         }
-        else if(x >= 10 && x <= 750 && y >= 180 && y <= 310)
+        else if(x >= g_area_array[1].start_x && x <= g_area_array[1].end_x && y >= g_area_array[1].start_y && y <= g_area_array[1].end_y)
         {
           clicked_toc_index = 1;
         }
-        else if(x >= 10 && x <= 750 && y >= 330 && y <= 450)
+        else if(x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y)
         {
           clicked_toc_index = 2;
         }
-        else if(x >= 10 && x <= 750 && y >= 470 && y <= 590)
+        else if(x >= g_area_array[3].start_x && x <= g_area_array[3].end_x && y >= g_area_array[3].start_y && y <= g_area_array[3].end_y)
         {
           clicked_toc_index = 3;
         }
-        else if(x >= 10 && x <= 750 && y >= 620 && y <= 750)
+        else if(x >= g_area_array[4].start_x && x <= g_area_array[4].end_x && y >= g_area_array[4].start_y && y <= g_area_array[4].end_y)
         {
           clicked_toc_index = 4;
         }
-        else if(x >= 10 && x <= 750 && y >= 770 && y <= 890)
+        else if(x >= g_area_array[5].start_x && x <= g_area_array[5].end_x && y >= g_area_array[5].start_y && y <= g_area_array[5].end_y)
         {
           clicked_toc_index = 5;
         }
@@ -346,54 +360,55 @@ switch (ui_state)
     break;
   case SETTINGS_PAGE: // 设置页面
     // 设置页面每行左右箭头触控区域（与设置页布局一致）
-    if (x >= 100 && x <= 650 && y >= 160 && y <= 260)
+    if (x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y)
     {
       settings_selected_idx = SET_TOUCH;
       action = SELECT_BOX;
       rt_kprintf("select touch switch\n");
     }
-    else if (x >= 100 && x <= 650 && y >= 300 && y <= 400)
+    else if (x >= g_area_array[5].start_x && x <= g_area_array[5].end_x && y >= g_area_array[5].start_y && y <= g_area_array[5].end_y)
     {
       settings_selected_idx = SET_TIMEOUT;
       action = SELECT_BOX;  
       rt_kprintf("select timeout switch\n");
     }
-    else if (x >= 100 && x <= 650 && y >= 450 && y <= 540)
+    else if (x >= g_area_array[8].start_x && x <= g_area_array[8].end_x && y >= g_area_array[8].start_y && y <= g_area_array[8].end_y)
     {
       settings_selected_idx = SET_FULL_REFRESH;
       action = SELECT_BOX;  
       rt_kprintf("select full refresh switch \n");
     }
-    else if (x >= 100 && x <= 650 && y >= 830 && y <= 950)
+    else if (x >= g_area_array[9].start_x && x <= g_area_array[9].end_x && y >= g_area_array[9].start_y && y <= g_area_array[9].end_y)
     {
       settings_selected_idx = SET_CONFIRM;
       action = SELECT;  
-      rt_kprintf("select touch switch\n");
+      rt_kprintf("select confirm button\n");
     }
+    
 
-    if(settings_selected_idx == SET_TOUCH && 0<=x && x<= 50 && 160<=y && y<=260)
+    if(settings_selected_idx == SET_TOUCH && g_area_array[0].start_x<=x && x<= g_area_array[0].end_x && g_area_array[0].start_y<=y && y<=g_area_array[0].end_y)
     {
       action = SELECT;
     }
-    else if(settings_selected_idx == SET_TOUCH && 700<=x && x<=750 && 160<=y && y<=260)
+    else if(settings_selected_idx == SET_TOUCH && g_area_array[1].start_x<=x && x<= g_area_array[1].end_x && g_area_array[1].start_y<=y && y<=g_area_array[1].end_y)
     {
       action = SELECT;
     }
-    else if(settings_selected_idx == SET_TIMEOUT && 0 <= x && x<=50 && 300 <= y && y<= 400)
+    else if(settings_selected_idx == SET_TIMEOUT && g_area_array[3].start_x<=x && x<= g_area_array[3].end_x && g_area_array[3].start_y<=y && y<=g_area_array[3].end_y)
     {
       action = PREV_OPTION;
       rt_kprintf("select timeout Reduce\n");
     }
-    else if(settings_selected_idx == SET_TIMEOUT && 700<=x && x<=750 && 300<=y && y<= 400)
+    else if(settings_selected_idx == SET_TIMEOUT && g_area_array[4].start_x<=x && x<= g_area_array[4].end_x && g_area_array[4].start_y<=y && y<=g_area_array[4].end_y)
     {
       action = NEXT_OPTION;
       rt_kprintf("select timeout increase\n");
     }
-    else if(settings_selected_idx == SET_FULL_REFRESH && 0 <= x && x<= 50 && 450 <= y && y<= 540)
+    else if(settings_selected_idx == SET_FULL_REFRESH && g_area_array[6].start_x<=x && x<= g_area_array[6].end_x && g_area_array[6].start_y<=y && y<=g_area_array[6].end_y)
     {
       action = PREV_OPTION;
     }
-    else if(settings_selected_idx == SET_FULL_REFRESH && 700 <= x && x<= 750 && 450 <= y && y<= 540)
+    else if(settings_selected_idx == SET_FULL_REFRESH && g_area_array[7].start_x<=x && x<= g_area_array[7].end_x && g_area_array[7].start_y<=y && y<=g_area_array[7].end_y)
     {
       action = NEXT_OPTION;
     }

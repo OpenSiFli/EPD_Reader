@@ -1,6 +1,6 @@
 #include "EpubList.h"
 #include <string.h>
-
+#include "UIRegionsManager.h"
 
 
 #ifndef UNIT_TEST
@@ -134,6 +134,7 @@ bool EpubList::load(const char *path)
 
 void EpubList::render()
 {
+  //clear_areas();
   ulog_d(TAG, "Rendering EPUB list");
   // what page are we on?
   int current_page = state.selected_item / EPUBS_PER_PAGE;
@@ -157,6 +158,7 @@ void EpubList::render()
   }
   for (int i = start_index; i < start_index + EPUBS_PER_PAGE && i < state.num_epubs; i++)
   {
+    
     // do we need to draw a new page of items?
     if (current_page != state.previous_rendered_page)
     {
@@ -191,6 +193,16 @@ void EpubList::render()
         title_block->render(renderer, i, text_xpos, text_ypos + y_offset);
         y_offset += renderer->get_line_height();
       }
+       // 计算整体区域范围
+    int area_start_x = image_xpos;
+    int area_start_y = image_ypos;
+    int area_end_x = std::max(image_xpos + image_width, text_xpos + text_width);
+    int area_end_y = std::max(image_ypos + image_height, text_ypos + title_height);
+    if((i%4)<4)
+    {
+      static_add_area(area_start_x, area_start_y, area_end_x - area_start_x, area_end_y - area_start_y, (i%4));
+    } 
+    
       delete title_block;
       delete epub;
     }
@@ -268,6 +280,22 @@ void EpubList::render()
   };
 
   draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
+  int start_up_page_x = btn_x0;
+  int start_up_page_y = btn_y + btn_gap * 2;
+  int end_up_page_x = btn_w;
+  int end_up_page_y = btn_h;
+  int start_page_x = btn_x0;
+  static_add_area(start_up_page_x, start_up_page_y, end_up_page_x, end_up_page_y, 4);
   draw_button(btn_x1, "主页面", m_bottom_mode && m_bottom_idx == 1);
+  int start_main_page_x = btn_x1;
+  int start_main_page_y = btn_y + btn_gap *2;
+  int end_main_page_x = btn_w;
+  int end_main_page_y = btn_h;
+  static_add_area(start_main_page_x, start_main_page_y, end_main_page_x, end_main_page_y, 5);
   draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
+  int start_down_page_x = btn_x2;
+  int start_down_page_y = btn_y + btn_gap *2;
+  int end_down_page_x = btn_w;
+  int end_down_page_y = btn_h;
+  static_add_area(start_down_page_x, start_down_page_y, end_down_page_x, end_down_page_y, 6);
 }

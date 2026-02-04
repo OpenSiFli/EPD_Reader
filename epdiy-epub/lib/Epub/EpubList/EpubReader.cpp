@@ -13,6 +13,7 @@
 #include "../Renderer/Renderer.h"
 #include "epub_mem.h"
 #include "epub_screen.h"
+#include "UIRegionsManager.h"
 static const char *TAG = "EREADER";
 extern "C" rt_uint32_t heap_free_size(void);
 
@@ -141,18 +142,20 @@ void EpubReader::set_state_section(uint16_t current_section) {
 
 void EpubReader::render_overlay()
 {
+  clear_areas(); // 清除之前的区域记录
+
   int page_w = renderer->get_page_width();
   int page_h = renderer->get_page_height();
   int area_y = (page_h * 2) / 3;    // 覆盖下方 1/3 屏幕
   int area_h = page_h - area_y;
   
-  renderer->fill_rect(0, area_y, page_w, area_h, 240);
+  renderer->fill_rect(0, area_y, page_w, area_h, 240);//绘制灰色背景
 
   // 三行布局：3,5,3
   const int rows = 3;
   const int cols[rows] = {3, 5, 3};
   const int gap_h = 20; // 行间距
-  const int gap_w = 10;
+  const int gap_w = 10; // 列间距
   const int row_h = 80; // 每行高度
   // 纵向居中放置三行
   int content_h = rows * row_h + (rows + 1) * gap_h;
@@ -214,6 +217,19 @@ void EpubReader::render_overlay()
       int w2 = usable_w - w0 - w1; 
       int widths[3] = { w0, w1, w2 };
       int cur_x = gap_w;
+      //将坐标位置映射到触控中
+      int first_one_x = cur_x;;
+      int first_one_y = y;
+      static_add_area(first_one_x, first_one_y, widths[0], row_h,0);
+
+      int second_one_x = cur_x + widths[0] + gap_w;
+      int second_one_y = y;
+      static_add_area(second_one_x, second_one_y, widths[1], row_h,1);
+
+      int third_one_x = cur_x + widths[0] + widths[1] + 2 * gap_w;
+      int third_one_y = y;
+      static_add_area(third_one_x, third_one_y, widths[2], row_h,2);
+
       for (int i = 0; i < c; ++i)
       {
         int w = widths[i];
@@ -245,6 +261,30 @@ void EpubReader::render_overlay()
     {
       int usable_w = page_w - (c + 1) * gap_w;
       int btn_w = usable_w / c;
+      // 第二行触控区域映射（索引3-7）
+      if (r == 1)  // 第二行
+      {
+          for (int i = 0; i < c; ++i)  // c = 5
+          {
+              int x = gap_w + i * (btn_w + gap_w);
+              int y_coord = y0 + gap_h + r * (row_h + gap_h);
+              
+              // 添加触控区域（索引3-7对应按钮）
+              static_add_area(x, y_coord, btn_w, row_h, 3 + i);
+          }
+      }
+      // 第三行触控区域映射（索引8-10）
+      else if (r == 2)  // 第三行
+      {
+          for (int i = 0; i < c; ++i)  // c = 3
+          {
+              int x = gap_w + i * (btn_w + gap_w);
+              int y_coord = y0 + gap_h + r * (row_h + gap_h);
+              
+              // 添加触控区域（索引8-10对应按钮）
+              static_add_area(x, y_coord, btn_w, row_h, 8 + i);
+          }
+      }
       for (int i = 0; i < c; ++i)
       {
         int x = gap_w + i * (btn_w + gap_w);

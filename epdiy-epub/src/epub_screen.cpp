@@ -3,6 +3,7 @@
 #include "epub_screen.h"
 #include <string.h>
 #include "type.h"
+#include "UIRegionsManager.h"
 
 extern TouchControls *touch_controls;
 extern "C" 
@@ -112,6 +113,7 @@ int screen_get_main_selected_option()
 // 绘制主页面
 static void render_main_page(Renderer *renderer)
 {
+  clear_areas(); // 清除之前的区域记录
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 255);
 
   const char *title = "S I F L I";
@@ -133,12 +135,22 @@ static void render_main_page(Renderer *renderer)
   const char *lt = "<";
   int lt_w = renderer->get_text_width(lt);
   int lt_h = renderer->get_line_height();
+  int left_arrow_x = margin_side;//矩形的X轴起始坐标
+  int left_arrow_y = y + margin_bottom;//矩形的Y轴起始坐标
+  // 记录左箭头区域
+  add_area(left_arrow_x, left_arrow_y, rect_w, rect_h);
+    
   renderer->draw_text(left_x + (rect_w - lt_w) / 2, y + (rect_h - lt_h) / 2, lt, false, true);
 
   // 右 ">"
   const char *gt = ">";
   int gt_w = renderer->get_text_width(gt);
   int gt_h = renderer->get_line_height();
+  int right_arrow_x = right_x ;//矩形的X轴起始坐标
+  int right_arrow_y = y + margin_bottom;//矩形的Y轴起始坐标
+  // 记录右箭头区域
+  add_area(right_arrow_x, right_arrow_y, rect_w, rect_h);
+  
   renderer->draw_text(right_x + (rect_w - gt_w) / 2, y + (rect_h - gt_h) / 2, gt, false, true);
 
   // 中间选项文本
@@ -158,6 +170,11 @@ static void render_main_page(Renderer *renderer)
   }
   int opt_w = renderer->get_text_width(opt_text);
   int opt_h = renderer->get_line_height();
+  int option_x = mid_x + (mid_w - opt_w) / 2 ;
+  int option_y = y + margin_bottom;
+    
+  // 记录选项区域
+  add_area(option_x, option_y, opt_w, opt_h);
   renderer->draw_text(mid_x + (mid_w - opt_w) / 2, y + (rect_h - opt_h) / 2, opt_text, false, true);
 }
 //主界面处理
@@ -205,6 +222,7 @@ void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw)
 // 设置页面
 void render_settings_page(Renderer *renderer)
 {
+  clear_areas(); // 清除之前的区域记录
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 255);
 
   // 标题
@@ -227,9 +245,17 @@ void render_settings_page(Renderer *renderer)
   int item_x = margin_lr + arrow_col_w;
   if (settings_selected_idx == SET_TOUCH)
   {
-    const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
+    const char *lt = "<"; 
+    int lt_w = renderer->get_text_width(lt);
+    int touch_left_x = margin_lr;
+    int touch_left_y = y; 
+    static_add_area(touch_left_x, touch_left_y, arrow_col_w, item_h,0);
     renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
+    
     const char *gt = ">"; int gt_w = renderer->get_text_width(gt);
+    int touch_right_x = page_w  - arrow_col_w + margin_lr;
+    int touch_right_y = y;
+    static_add_area(touch_right_x, touch_right_y, arrow_col_w, item_h,1);
     renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, gt, false, true);
   }
   if (settings_selected_idx == SET_TOUCH)
@@ -250,6 +276,9 @@ void render_settings_page(Renderer *renderer)
     int tx = item_x + (item_w - t1_w) / 2;
     if (tx < item_x + 4) tx = item_x + 4;
     if (tx + t1_w > item_x + item_w - 4) tx = item_x + item_w - t1_w - 4;
+    int touch_switch_x = item_x;
+    int touch_switch_y = y ;
+    static_add_area(touch_switch_x, touch_switch_y, item_w, item_h,2);
     renderer->draw_text(tx, y + (item_h - lh) / 2, buf1, false, true);
   }
   y += item_h + gap;
@@ -257,9 +286,18 @@ void render_settings_page(Renderer *renderer)
   // 2) 超时关机
   if (settings_selected_idx == SET_TIMEOUT)
   {
-    const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
+    const char *lt = "<"; 
+    int lt_w = renderer->get_text_width(lt);
+    int timeout_left_x = margin_lr;
+    int timeout_left_y = y;
+    static_add_area(timeout_left_x, timeout_left_y, arrow_col_w, item_h,3);
     renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
-    const char *gt = ">"; int gt_w = renderer->get_text_width(gt);
+    
+    const char *gt = ">"; 
+    int gt_w = renderer->get_text_width(gt);
+    int timeout_right_x = page_w - arrow_col_w + margin_lr;
+    int timeout_right_y = y;
+    static_add_area(timeout_right_x, timeout_right_y, arrow_col_w, item_h,4);
     renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, gt, false, true);
   }
   if (settings_selected_idx == SET_TIMEOUT)
@@ -288,6 +326,9 @@ void render_settings_page(Renderer *renderer)
     int tx = item_x + (item_w - t2_w) / 2;
     if (tx < item_x + 4) tx = item_x + 4;
     if (tx + t2_w > item_x + item_w - 4) tx = item_x + item_w - t2_w - 4;
+    int timeout_setting_x = item_x;
+    int timeout_setting_y = y;
+    static_add_area(timeout_setting_x, timeout_setting_y, item_w, item_h,5);
     renderer->draw_text(tx, y + (item_h - lh) / 2, buf2, false, true);
   }
   y += item_h + gap;
@@ -295,9 +336,18 @@ void render_settings_page(Renderer *renderer)
   // 3) 全刷周期
   if (settings_selected_idx == SET_FULL_REFRESH)
   {
-    const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
+    const char *lt = "<"; 
+    int lt_w = renderer->get_text_width(lt);
+    int full_refresh_left_x = margin_lr;
+    int full_refresh_left_y = y;
+    static_add_area(full_refresh_left_x, full_refresh_left_y, arrow_col_w, item_h,6);  
     renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
-    const char *gt = ">"; int gt_w = renderer->get_text_width(gt);
+    
+    const char *gt = ">"; 
+    int gt_w = renderer->get_text_width(gt);
+    int full_refresh_right_x = page_w  - arrow_col_w + margin_lr;
+    int full_refresh_right_y = y;
+    static_add_area(full_refresh_right_x, full_refresh_right_y, arrow_col_w, item_h,7);
     renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, gt, false, true);
   }
   if (settings_selected_idx == SET_FULL_REFRESH)
@@ -319,6 +369,9 @@ void render_settings_page(Renderer *renderer)
     int tx = item_x + (item_w - t3_w) / 2;
     if (tx < item_x + 4) tx = item_x + 4;
     if (tx + t3_w > item_x + item_w - 4) tx = item_x + item_w - t3_w - 4;
+    int full_refresh_setting_x = item_x;
+    int full_refresh_setting_y = y;
+    static_add_area(full_refresh_setting_x, full_refresh_setting_y, item_w, item_h,8);
     renderer->draw_text(tx, y + (item_h - lh) / 2, buf3, false, true);
   }
   y += item_h + gap;
@@ -339,6 +392,9 @@ void render_settings_page(Renderer *renderer)
   const char *confirm = "确认";
   int c_w = renderer->get_text_width(confirm);
   int c_h = renderer->get_line_height();
+  int confirm_button_x = confirm_x;
+  int confirm_button_y = confirm_y;
+  static_add_area(confirm_button_x, confirm_button_y, confirm_w, confirm_h,9);
   renderer->draw_text(confirm_x + (confirm_w - c_w) / 2, confirm_y + (confirm_h - c_h) / 2, confirm, false, true);
 }
 
