@@ -539,8 +539,6 @@ int get_part_disp_times(void)
 }
 
 #define PART_DISP_TIMES 10
-static uint32_t reflesh_times = 0;
-
 L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
 {
     uint32_t line, line_bytes;

@@ -4,7 +4,9 @@ from building import *
 import rtconfig
 
 cwd = GetCurrentDir()
-src = ['main.cpp','epub_screen.cpp','epub_mem.c','epub_fonts.c']
+
+src = ['main.cpp','UIRegionsManager.cpp','epub_screen.cpp','epub_mem.c','epub_fonts.c']
+
 src = src + Glob('./assets/*.c') 
 CPPPATH = [cwd]
 
@@ -21,4 +23,3 @@ for d in list:
 objs = objs + SConscript(os.path.join(cwd, '../waveform/SConscript'))
 
 Return('objs')
-

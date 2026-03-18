@@ -22,74 +22,61 @@ if !BSP_USING_BUILT_LCD
 #define the EPD connection type
 	config LCD_USING_EPD_SPI
 		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V12_SPI
 		default n
 	config BSP_LCDC_USING_EPD_8BIT
-		def_bool n
+		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V11 || BSP_USING_BOARD_SF32_OED_EPD_V12
+		default n
 
 #define the EPD module name
 	config LCD_USING_OPM060D
 		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V11 || BSP_USING_BOARD_SF32_OED_EPD_V12
 		default n
 
-	config LCD_USING_OPM060D
-	    bool 
+	config LCD_USING_EPD_YZC085_V100
+		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V11
+		default n
+		select BSP_LCDC_USING_EPD_8BIT
+		select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
+
+	config LCD_USING_EPD_YZC085_V100_V12
+		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V12
+		default n
+		select BSP_LCDC_USING_EPD_8BIT
+		select TSC_USING_GT967 if BSP_USING_TOUCHD
+
+	config LCD_USING_EPD_OPMO37A3
+		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V12_SPI
+		default n
+		select LCD_USING_EPD_SPI
+		select TSC_USING_FT6336U if BSP_USING_TOUCHD
+
+	config LCD_USING_EPD_R7D005
+		bool
 		default n
 
 
 #define the touch controller name
 	config TSC_USING_FT5446U_V01
 		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V11
 		default n
 
 	config TSC_USING_FT6336U
 		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V12_SPI
 		default n
 
 	config TSC_USING_GT967
 		bool
+		default y if BSP_USING_BOARD_SF32_OED_EPD_V12
 		default n
-	config TSC_USING_GT967
-		bool
-		default n
-	config TSC_USING_GT967
-		bool
-		default n
-	choice
-		prompt "Custom LCD driver"
-		default LCD_USING_EPD_YZC085_V100 if BSP_USING_BOARD_SF32_OED_EPD_V11
-		default LCD_USING_EPD_YZC085_V100_V12 if BSP_USING_BOARD_SF32_OED_EPD_V12
-		
-		config LCD_USING_EPD_YZC085_V100_V12
-			bool "6.0 rect electronic paper display(EPD YZC085_V1.05 1032x758) for V1.2 board"
-			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
-			select LCD_USING_OPM060D
-			select BSP_LCDC_USING_EPD_8BIT
-
-		config LCD_USING_EPD_YZC085_V100_V12
-			bool "6.0 rect electronic paper display(EPD YZC085_V1.05 1032x758)"
-			select TSC_USING_GT967 if BSP_USING_TOUCHD
-			select LCD_USING_YZC085_V100
-			select BSP_LCDC_USING_EPD_8BIT
-
-		config LCD_USING_EPD_YZC085_V100
-			bool "6.0 rect electronic paper display(EPD YZC085_V1.05 1032x758) for V1.1 board"
-			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
-			select LCD_USING_OPM060D
-			select BSP_LCDC_USING_EPD_8BIT
-
-		config LCD_USING_EPD_R7D005
-			bool "6.0 rect electronic paper display(EPD R7D005_-1.30 1448x1072)"
-			select TSC_USING_FT5446U_V01 if BSP_USING_TOUCHD
-			select LCD_USING_OPM060D
-			select BSP_LCDC_USING_EPD_8BIT
-
-		config LCD_USING_EPD_OPMO37A3
-			bool "3.7 rect electronic paper display  SPI (OPM037A3 240x416)"
-			select TSC_USING_FT6336U if BSP_USING_TOUCHD
-			select LCD_USING_EPD_SPI
-
-	endchoice
-
+	
 
 	config EPD_WAVEFORM_USE_BIN
 	    bool "OPM060D use binary waveform"

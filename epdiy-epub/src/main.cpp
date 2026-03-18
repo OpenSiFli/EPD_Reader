@@ -13,7 +13,9 @@
 #include "bf0_pm.h"
 #include "epd_driver.h"
 #include "type.h"
+
 #include "UIRegionsManager.h"
+
 #undef LOG_TAG
 #undef DBG_LEVEL
 #define  DBG_LEVEL            DBG_LOG //DBG_INFO  //
@@ -83,6 +85,9 @@ typedef enum {
   OPTION_ENTER_SETTINGS      // 进入设置 -> 打印 3
 } MainOption;
 void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_redraw);
+
+
+//阅读设置页面
 
 void handleEpub(Renderer *renderer, UIAction action)
 {
@@ -1176,7 +1181,7 @@ extern "C"
   int main()
   {
     // dump out the epub list state
-    //rt_pm_request(PM_SLEEP_MODE_IDLE); 
+    rt_pm_request(PM_SLEEP_MODE_IDLE); 
     ulog_i("main", "epub list state num_epubs=%d", epub_list_state.num_epubs);
     ulog_i("main", "epub list state is_loaded=%d", epub_list_state.is_loaded);
     ulog_i("main", "epub list state selected_item=%d", epub_list_state.selected_item);
