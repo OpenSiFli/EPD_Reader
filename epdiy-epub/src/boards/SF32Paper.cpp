@@ -15,6 +15,7 @@ extern "C" {
 #ifndef _WIN32
     #include "drv_flash.h"
 #endif /* _WIN32 */
+#include "font_ft.h"
 extern const EpdFont regular_font;
 extern const EpdFont bold_font;
 extern const EpdFont italic_font;
@@ -101,6 +102,9 @@ void SF32Paper::power_up()
         }
     }
     HAL_LPAON_Sleep();
+    if (epd_font_ft_init_builtin(32) != 0) {
+        rt_kprintf("ERROR: Vector font init failed!\n");
+    }
 }
 void SF32Paper::prepare_to_sleep()
 {

@@ -4,7 +4,7 @@ from building import *
 import rtconfig
 
 cwd = GetCurrentDir()
-src = ['main.cpp','epub_mem.c','epub_fonts.c']
+src = ['main.cpp','epub_mem.c','epub_fonts.c','reading_settings.cpp','font_manager.c','ft_dfs_bridge.c']
 src = src + Glob('./assets/*.c') 
 CPPPATH = [cwd]
 
