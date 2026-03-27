@@ -1,4 +1,3 @@
-
 #include "EpubList/EpubList.h"
 #include "epub_screen.h"
 #include <string.h>
@@ -24,7 +23,7 @@ typedef enum
   OPTION_ENTER_SETTINGS     // 进入设置
 } MainOption;
 
-static MainOption main_option = OPTION_OPEN_LIBRARY; // 默认“打开书库”
+static MainOption main_option = OPTION_OPEN_LIBRARY; // 默认"打开书库"
 // 全刷周期选项：5、10、20、每次(0)
 static const int kFullRefreshOptions[] = {5, 10, 20, 0};
 static const int kFullRefreshOptionsCount = sizeof(kFullRefreshOptions) / sizeof(kFullRefreshOptions[0]);
@@ -41,13 +40,11 @@ void screen_cycle_full_refresh_period(bool refresh)
 {
   if(refresh)
   {
-    full_refresh_idx = (full_refresh_idx + 1) % kFullRefreshOptionsCount;   // ？% 4
-
+    full_refresh_idx = (full_refresh_idx + 1) % kFullRefreshOptionsCount;
   }
   else
   {
-    full_refresh_idx = (full_refresh_idx - 1) % kFullRefreshOptionsCount;   // ？% 4
-
+    full_refresh_idx = (full_refresh_idx - 1 + kFullRefreshOptionsCount) % kFullRefreshOptionsCount;
   }
 }
 
@@ -90,7 +87,7 @@ static void adjust_timeout(bool increase)
   }
   else
   {
-    timeout_idx = (timeout_idx - 1) % kTimeoutOptionsCount;
+    timeout_idx = (timeout_idx - 1 + kTimeoutOptionsCount) % kTimeoutOptionsCount;
   }
   timeout_shutdown_minutes = kTimeoutOptions[timeout_idx];
 }
@@ -140,11 +137,9 @@ static void render_main_page(Renderer *renderer)
   int lt_w = renderer->get_text_width(lt);
   int lt_h = renderer->get_line_height();
 
-  int left_arrow_x = margin_side;//矩形的X轴起始坐标
-  int left_arrow_y = y + margin_bottom;//矩形的Y轴起始坐标
-  // 记录左箭头区域
+  int left_arrow_x = margin_side;
+  int left_arrow_y = y + margin_bottom;
   add_area(left_arrow_x, left_arrow_y, rect_w, rect_h);
-    
 
   renderer->draw_text(left_x + (rect_w - lt_w) / 2, y + (rect_h - lt_h) / 2, lt, false, true);
 
@@ -153,11 +148,9 @@ static void render_main_page(Renderer *renderer)
   int gt_w = renderer->get_text_width(gt);
   int gt_h = renderer->get_line_height();
 
-  int right_arrow_x = right_x ;//矩形的X轴起始坐标
-  int right_arrow_y = y + margin_bottom;//矩形的Y轴起始坐标
-  // 记录右箭头区域
+  int right_arrow_x = right_x;
+  int right_arrow_y = y + margin_bottom;
   add_area(right_arrow_x, right_arrow_y, rect_w, rect_h);
-  
 
   renderer->draw_text(right_x + (rect_w - gt_w) / 2, y + (rect_h - gt_h) / 2, gt, false, true);
 
@@ -182,7 +175,6 @@ static void render_main_page(Renderer *renderer)
   int option_x = mid_x + (mid_w - opt_w) / 2 ;
   int option_y = y + margin_bottom;
     
-  // 记录选项区域
   add_area(option_x, option_y, opt_w, opt_h);
 
   renderer->draw_text(mid_x + (mid_w - opt_w) / 2, y + (rect_h - opt_h) / 2, opt_text, false, true);
@@ -192,36 +184,29 @@ void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw)
 {
   if (needs_redraw || action == NONE)
   {
-    render_main_page(renderer);//绘制主界面
+    render_main_page(renderer);
     return;
   }
   switch (action)
   {
-    case UP:   // 左切换
+    case UP:
       if (main_option == OPTION_OPEN_LIBRARY) main_option = OPTION_ENTER_SETTINGS;
       else if (main_option == OPTION_CONTINUE_READING) main_option = OPTION_OPEN_LIBRARY;
       else main_option = OPTION_CONTINUE_READING;
       render_main_page(renderer);
       break;
-    case DOWN: // 右切换
+    case DOWN:
       if (main_option == OPTION_OPEN_LIBRARY) main_option = OPTION_CONTINUE_READING;
       else if (main_option == OPTION_CONTINUE_READING) main_option = OPTION_ENTER_SETTINGS;
       else main_option = OPTION_OPEN_LIBRARY;
       render_main_page(renderer);
       break;
     case SELECT:
-      // 由上层 main.cpp 负责切换 页面UIState
       switch (main_option)
       {
-        case OPTION_OPEN_LIBRARY:     
-            rt_kprintf("1\n"); 
-        break;
-        case OPTION_CONTINUE_READING: 
-            rt_kprintf("2\n"); 
-        break;
-        case OPTION_ENTER_SETTINGS:   
-            rt_kprintf("3\n"); 
-        break;
+        case OPTION_OPEN_LIBRARY:     rt_kprintf("1\n"); break;
+        case OPTION_CONTINUE_READING: rt_kprintf("2\n"); break;
+        case OPTION_ENTER_SETTINGS:   rt_kprintf("3\n"); break;
       }
       break;
     default:
@@ -246,188 +231,111 @@ void render_settings_page(Renderer *renderer)
   renderer->draw_text((page_w - title_w) / 2, 40, title, true, true);
 
   // 列表项布局参数
-  int margin_lr = 6; // 左右边距，给左右触控箭头
-  int item_h = 100;   // 矩形高度
-  int gap = 54;      // 列表项之间的间距
-  int arrow_col_w = 40; // 左右触控箭头列宽度
-  int y = 40 + title_h + 20; // 第一项起始Y
+  int margin_lr = 6;
+  int item_h = 100;
+  int gap = 40;        // 缩小间距以容纳更多选项
+  int arrow_col_w = 40;
+  int y = 40 + title_h + 20;
+
+  int item_w = page_w - margin_lr * 2 - arrow_col_w * 2;
+  int item_x = margin_lr + arrow_col_w;
+  int lh = renderer->get_line_height();
+
+  // ---- 辅助 lambda：绘制一个设置项行 ----
+  auto draw_setting_row = [&](int idx, const char *text, int row_y) {
+    // 左右箭头（仅选中时显示）
+    if (settings_selected_idx == idx)
+    {
+      const char *lt = "<"; int lt_w = renderer->get_text_width(lt);
+      static_add_area(margin_lr, row_y, arrow_col_w, item_h, idx * 3);
+      renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, row_y + (item_h - lh) / 2, lt, false, true);
+
+      const char *gt = ">"; int gt_w = renderer->get_text_width(gt);
+      static_add_area(page_w - arrow_col_w + margin_lr, row_y, arrow_col_w, item_h, idx * 3 + 1);
+      renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, row_y + (item_h - lh) / 2, gt, false, true);
+
+      for (int k = 0; k < 5; ++k) renderer->draw_rect(item_x + k, row_y + k, item_w - 2 * k, item_h - 2 * k, 0);
+    }
+    else
+    {
+      renderer->draw_rect(item_x, row_y, item_w, item_h, 0);
+    }
+
+    int t_w = renderer->get_text_width(text);
+    int tx = item_x + (item_w - t_w) / 2;
+    if (tx < item_x + 4) tx = item_x + 4;
+    if (tx + t_w > item_x + item_w - 4) tx = item_x + item_w - t_w - 4;
+    static_add_area(item_x, row_y, item_w, item_h, idx * 3 + 2);
+    renderer->draw_text(tx, row_y + (item_h - lh) / 2, text, false, true);
+  };
 
   // 1) 触控开关
-  int item_w = page_w - margin_lr * 2 - arrow_col_w * 2; // 为左右箭头列留边
-  int item_x = margin_lr + arrow_col_w;
-  if (settings_selected_idx == SET_TOUCH)
   {
-
-    const char *lt = "<"; 
-    int lt_w = renderer->get_text_width(lt);
-    int touch_left_x = margin_lr;
-    int touch_left_y = y; 
-    static_add_area(touch_left_x, touch_left_y, arrow_col_w, item_h,0);
-    renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
-    
-    const char *gt = ">"; int gt_w = renderer->get_text_width(gt);
-    int touch_right_x = page_w  - arrow_col_w + margin_lr;
-    int touch_right_y = y;
-    static_add_area(touch_right_x, touch_right_y, arrow_col_w, item_h,1);
-
-    renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, gt, false, true);
+    bool touch_on = touch_controls ? touch_controls->isTouchEnabled() : false;
+    char buf[48];
+    rt_snprintf(buf, sizeof(buf), "触控开关：%s", touch_on ? "开" : "关");
+    draw_setting_row(SET_TOUCH, buf, y);
+    y += item_h + gap;
   }
-  if (settings_selected_idx == SET_TOUCH)
-  {
-    // 选中强化：多重描边，提高可见度
-    for (int i = 0; i < 5; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
-  }
-  else
-  {
-    renderer->draw_rect(item_x, y, item_w, item_h, 0); //画框线
-  }
-  bool touch_on = touch_controls ? touch_controls->isTouchEnabled() : false;
-  char buf1[48];
-  rt_snprintf(buf1, sizeof(buf1), "触控开关：%s", touch_on ? "开" : "关");
-  int t1_w = renderer->get_text_width(buf1);
-  int lh = renderer->get_line_height();
-  {
-    int tx = item_x + (item_w - t1_w) / 2;
-    if (tx < item_x + 4) tx = item_x + 4;
-    if (tx + t1_w > item_x + item_w - 4) tx = item_x + item_w - t1_w - 4;
-
-    int touch_switch_x = item_x;
-    int touch_switch_y = y ;
-    static_add_area(touch_switch_x, touch_switch_y, item_w, item_h,2);
-
-    renderer->draw_text(tx, y + (item_h - lh) / 2, buf1, false, true);
-  }
-  y += item_h + gap;
 
   // 2) 超时关机
-  if (settings_selected_idx == SET_TIMEOUT)
   {
-
-    const char *lt = "<"; 
-    int lt_w = renderer->get_text_width(lt);
-    int timeout_left_x = margin_lr;
-    int timeout_left_y = y;
-    static_add_area(timeout_left_x, timeout_left_y, arrow_col_w, item_h,3);
-    renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
-    
-    const char *gt = ">"; 
-    int gt_w = renderer->get_text_width(gt);
-    int timeout_right_x = page_w - arrow_col_w + margin_lr;
-    int timeout_right_y = y;
-    static_add_area(timeout_right_x, timeout_right_y, arrow_col_w, item_h,4);
-
-    renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, gt, false, true);
+    char buf[64];
+    if (timeout_shutdown_minutes == 0)
+      rt_snprintf(buf, sizeof(buf), "超时关机：不关机");
+    else if (timeout_shutdown_minutes < 60)
+      rt_snprintf(buf, sizeof(buf), "超时关机：%d分钟", timeout_shutdown_minutes);
+    else
+      rt_snprintf(buf, sizeof(buf), "超时关机：%d小时", timeout_shutdown_minutes / 60);
+    draw_setting_row(SET_TIMEOUT, buf, y);
+    y += item_h + gap;
   }
-  if (settings_selected_idx == SET_TIMEOUT)
-  {
-    for (int i = 0; i < 5; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
-  }
-  else
-  {
-    renderer->draw_rect(item_x, y, item_w, item_h, 0);
-  }
-  char buf2[64];
-  if (timeout_shutdown_minutes == 0)
-  {
-    rt_snprintf(buf2, sizeof(buf2), "超时关机：不关机");
-  }
-  else if (timeout_shutdown_minutes < 60)
-  {
-    rt_snprintf(buf2, sizeof(buf2), "超时关机：%d分钟", timeout_shutdown_minutes);
-  }
-  else
-  {
-    rt_snprintf(buf2, sizeof(buf2), "超时关机：%d小时", timeout_shutdown_minutes / 60);
-  }
-  {
-    int t2_w = renderer->get_text_width(buf2);
-    int tx = item_x + (item_w - t2_w) / 2;
-    if (tx < item_x + 4) tx = item_x + 4;
-    if (tx + t2_w > item_x + item_w - 4) tx = item_x + item_w - t2_w - 4;
-
-    int timeout_setting_x = item_x;
-    int timeout_setting_y = y;
-    static_add_area(timeout_setting_x, timeout_setting_y, item_w, item_h,5);
-
-    renderer->draw_text(tx, y + (item_h - lh) / 2, buf2, false, true);
-  }
-  y += item_h + gap;
 
   // 3) 全刷周期
-  if (settings_selected_idx == SET_FULL_REFRESH)
   {
-
-    const char *lt = "<"; 
-    int lt_w = renderer->get_text_width(lt);
-    int full_refresh_left_x = margin_lr;
-    int full_refresh_left_y = y;
-    static_add_area(full_refresh_left_x, full_refresh_left_y, arrow_col_w, item_h,6);  
-    renderer->draw_text(margin_lr + (arrow_col_w - lt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, lt, false, true);
-    
-    const char *gt = ">"; 
-    int gt_w = renderer->get_text_width(gt);
-    int full_refresh_right_x = page_w  - arrow_col_w + margin_lr;
-    int full_refresh_right_y = y;
-    static_add_area(full_refresh_right_x, full_refresh_right_y, arrow_col_w, item_h,7);
-
-    renderer->draw_text(page_w - margin_lr - arrow_col_w + (arrow_col_w - gt_w) / 2, y + (item_h - renderer->get_line_height()) / 2, gt, false, true);
+    char buf[64];
+    int fr_val = screen_get_full_refresh_period();
+    if (fr_val == 0)
+      rt_snprintf(buf, sizeof(buf), "全刷周期：每次");
+    else
+      rt_snprintf(buf, sizeof(buf), "全刷周期：%d 次", fr_val);
+    draw_setting_row(SET_FULL_REFRESH, buf, y);
+    y += item_h + gap;
   }
-  if (settings_selected_idx == SET_FULL_REFRESH)
+
+  // 4) 阅读设置（进入子页面）
   {
-    for (int i = 0; i < 5; ++i) renderer->draw_rect(item_x + i, y + i, item_w - 2 * i, item_h - 2 * i, 0);
+    draw_setting_row(SET_READING_SETTINGS, "阅读设置", y);
+    y += item_h + gap;
   }
-  else
+
+  // 5) 确认按钮
   {
-    renderer->draw_rect(item_x, y, item_w, item_h, 0);
+    int confirm_h = 120;
+    int confirm_w = item_w;
+    int confirm_x = (page_w - confirm_w) / 2;
+    int confirm_y = page_h - confirm_h - 60;
+    if (settings_selected_idx == SET_CONFIRM)
+    {
+      for (int i = 0; i < 5; ++i) renderer->draw_rect(confirm_x + i, confirm_y + i, confirm_w - 2 * i, confirm_h - 2 * i, 0);
+    }
+    else
+    {
+      renderer->draw_rect(confirm_x, confirm_y, confirm_w, confirm_h, 0);
+    }
+    const char *confirm = "确认";
+    int c_w = renderer->get_text_width(confirm);
+    int c_h = renderer->get_line_height();
+    static_add_area(confirm_x, confirm_y, confirm_w, confirm_h, SET_CONFIRM * 3 + 2);
+    renderer->draw_text(confirm_x + (confirm_w - c_w) / 2, confirm_y + (confirm_h - c_h) / 2, confirm, false, true);
   }
-  char buf3[64];
-  int fr_val = screen_get_full_refresh_period();
-  if (fr_val == 0)
-    rt_snprintf(buf3, sizeof(buf3), "全刷周期：每次");
-  else
-    rt_snprintf(buf3, sizeof(buf3), "全刷周期：%d 次", fr_val);
-  {
-    int t3_w = renderer->get_text_width(buf3);
-    int tx = item_x + (item_w - t3_w) / 2;
-    if (tx < item_x + 4) tx = item_x + 4;
-    if (tx + t3_w > item_x + item_w - 4) tx = item_x + item_w - t3_w - 4;
-
-    int full_refresh_setting_x = item_x;
-    int full_refresh_setting_y = y;
-    static_add_area(full_refresh_setting_x, full_refresh_setting_y, item_w, item_h,8);
-
-    renderer->draw_text(tx, y + (item_h - lh) / 2, buf3, false, true);
-  }
-  y += item_h + gap;
-
-  // 底部 确认 按钮
-  int confirm_h = 120; // 矩形框高度
-  int confirm_w = item_w; // 宽度
-  int confirm_x = (page_w - confirm_w) / 2; // 居中
-  int confirm_y = page_h - confirm_h - 60; // 距离底部位置
-  if (settings_selected_idx == SET_CONFIRM)
-  {
-    for (int i = 0; i < 5; ++i) renderer->draw_rect(confirm_x + i, confirm_y + i, confirm_w - 2 * i, confirm_h - 2 * i, 0);
-  }
-  else
-  {
-    renderer->draw_rect(confirm_x, confirm_y, confirm_w, confirm_h, 0);
-  }
-  const char *confirm = "确认";
-  int c_w = renderer->get_text_width(confirm);
-  int c_h = renderer->get_line_height();
-
-  int confirm_button_x = confirm_x;
-  int confirm_button_y = confirm_y;
-  static_add_area(confirm_button_x, confirm_button_y, confirm_w, confirm_h,9);
-
-  renderer->draw_text(confirm_x + (confirm_w - c_w) / 2, confirm_y + (confirm_h - c_h) / 2, confirm, false, true);
 }
 
 // 设置页面交互处理
-bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
+// 返回值：0=继续，1=回主页，2=进阅读设置
+int handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
 {
-  // 读取并清除一次性的触控箭头标记，避免后续硬件按键误用
+  // 读取并清除一次性的触控箭头标记
   int touch_row = g_touch_last_settings_row;
   int touch_dir = g_touch_last_settings_dir;
   g_touch_last_settings_row = -1;
@@ -436,13 +344,12 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
   if (needs_redraw || action == NONE)
   {
     render_settings_page(renderer);
-    return false;
+    return 0;
   }
 
   switch (action)
   {
     case UP:
-      // 触控箭头若命中“超时关机”行且为左箭头（减），执行减；否则执行上下选择
       if (settings_selected_idx == SET_TIMEOUT && touch_row == 1 && touch_dir == -1)
       {
         adjust_timeout(false);
@@ -455,7 +362,6 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
       }
       break;
     case DOWN:
-      // 触控箭头若命中“超时关机”行且为右箭头（加），执行加；否则执行上下选择
       if (settings_selected_idx == SET_TIMEOUT && touch_row == 1 && touch_dir == +1)
       {
         adjust_timeout(true);
@@ -468,50 +374,38 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
       }
       break;
     case SELECT_BOX:
-      if(settings_selected_idx == SET_TOUCH)
+      if(settings_selected_idx == SET_READING_SETTINGS)
       {
-        render_settings_page(renderer);
-      }
-      else if(settings_selected_idx == SET_TIMEOUT)
-      {
-        render_settings_page(renderer);
-      }
-      else if(settings_selected_idx == SET_FULL_REFRESH)
-      {
-        render_settings_page(renderer);
+        return 2; // 进入阅读设置
       }
       else if(settings_selected_idx == SET_CONFIRM)
       {
         render_settings_page(renderer);
-        return true;
+        return 1; // 回主页
       }
+      render_settings_page(renderer);
       break;
     case PREV_OPTION:
       if (settings_selected_idx == SET_TIMEOUT)
       {
-        // SELECT 在超时关机项上为加操作（循环）
         adjust_timeout(false);
         render_settings_page(renderer);
       }
       else if(settings_selected_idx == SET_FULL_REFRESH)
       {
-       
         screen_cycle_full_refresh_period(false);
         set_part_disp_times(screen_get_full_refresh_period());
         render_settings_page(renderer);
       }
-    
       break;
     case NEXT_OPTION:
       if (settings_selected_idx == SET_TIMEOUT)
       {
-        // SELECT 在超时关机项上为加操作（循环）
         adjust_timeout(true);
         render_settings_page(renderer);
       }
       else if(settings_selected_idx == SET_FULL_REFRESH)
       {
-       
         screen_cycle_full_refresh_period(true);
         set_part_disp_times(screen_get_full_refresh_period());
         render_settings_page(renderer);
@@ -532,28 +426,28 @@ bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw)
       }
       if (settings_selected_idx == SET_TIMEOUT)
       {
-        // SELECT 在超时关机项上为加操作（循环）
         adjust_timeout(true);
         render_settings_page(renderer);
         break;
       }
       if (settings_selected_idx == SET_FULL_REFRESH)
       {
-        // SELECT 在全刷周期项上为加操作（循环）
         screen_cycle_full_refresh_period(true);
         set_part_disp_times(screen_get_full_refresh_period());
         render_settings_page(renderer);
         break;
       }
+      if (settings_selected_idx == SET_READING_SETTINGS)
+      {
+        return 2; // 进入阅读设置页面
+      }
       if (settings_selected_idx == SET_CONFIRM)
       {
-        // 由上层切回主页面
-        return true;
+        return 1; // 回主页
       }
-      // 其他项当前不处理
       break;
     default:
       break;
   }
-  return false;
+  return 0;
 }

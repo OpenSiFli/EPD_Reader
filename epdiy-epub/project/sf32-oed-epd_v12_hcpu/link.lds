@@ -197,7 +197,7 @@ SECTIONS
 
   .rom2 :
   {
-    *epub_fonts.o         (.text* .rodata*)
+    *(.font_data)
   } > ROM2
 
 

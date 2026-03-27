@@ -19,8 +19,10 @@ int screen_get_main_selected_option();
 // 主页面交互与渲染
 void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw);
 
-// 设置页面交互与渲染；返回 true 表示确认并退出到主页面
-bool handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw);
+// 设置页面交互与渲染
+// 返回值：0=继续停留在设置页，1=确认退出到主页面，2=进入阅读设置页面
+int handleSettingsPage(Renderer *renderer, UIAction action, bool needs_redraw);
+
 // 切换全刷周期（循环）
 void screen_cycle_full_refresh_period(bool refresh);
 // 获取当前全刷周期值

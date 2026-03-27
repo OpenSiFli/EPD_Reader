@@ -134,7 +134,7 @@ bool EpubList::load(const char *path)
 
 void EpubList::render()
 {
-  //clear_areas();
+  clear_areas();
   ulog_d(TAG, "Rendering EPUB list");
   // what page are we on?
   int current_page = state.selected_item / EPUBS_PER_PAGE;
@@ -198,13 +198,18 @@ void EpubList::render()
     int area_start_y = image_ypos;
     int area_end_x = std::max(image_xpos + image_width, text_xpos + text_width);
     int area_end_y = std::max(image_ypos + image_height, text_ypos + title_height);
-    if((i%4)<4)
-    {
-      static_add_area(area_start_x, area_start_y, area_end_x - area_start_x, area_end_y - area_start_y, (i%4));
-    } 
     
       delete title_block;
       delete epub;
+    }
+
+    // 注册触控区域（无论是否重绘都需要注册，因为 clear_areas 每次都清空）
+    {
+      int area_x = PADDING;
+      int area_y_start = ypos + PADDING;
+      int area_w = renderer->get_page_width() - PADDING * 2;
+      int area_h = cell_height - PADDING * 2;
+      static_add_area(area_x, area_y_start, area_w, area_h, (i % 4));
     }
     // clear the selection box around the previous selected item
     if (state.previous_selected_item == i)
@@ -282,4 +287,9 @@ void EpubList::render()
   draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
   draw_button(btn_x1, "主页面", m_bottom_mode && m_bottom_idx == 1);
   draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
+
+  // 注册底部三按钮触控区域：g_area_array[4]=上一页, [5]=主页面, [6]=下一页
+  static_add_area(btn_x0, btn_y, btn_w, btn_h, 4);
+  static_add_area(btn_x1, btn_y, btn_w, btn_h, 5);
+  static_add_area(btn_x2, btn_y, btn_w, btn_h, 6);
 }

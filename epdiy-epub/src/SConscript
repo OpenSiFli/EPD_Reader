@@ -5,7 +5,7 @@ import rtconfig
 
 cwd = GetCurrentDir()
 
-src = ['main.cpp','UIRegionsManager.cpp','epub_screen.cpp','epub_mem.c','epub_fonts.c']
+src = ['main.cpp','UIRegionsManager.cpp','epub_screen.cpp','epub_mem.c','epub_fonts.c','font_manager.c','ft_dfs_bridge.c','reading_settings.cpp']
 
 src = src + Glob('./assets/*.c') 
 CPPPATH = [cwd]

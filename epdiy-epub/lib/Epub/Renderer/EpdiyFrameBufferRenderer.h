@@ -5,6 +5,7 @@
 #include "Renderer.h"
 #include "miniz.h"
 #include "epub_mem.h"
+#include "font_ft.h"
 
 #define GAMMA_VALUE (1.0f / 0.8f)
 
@@ -197,12 +198,12 @@ public:
   }
   virtual int get_space_width()
   {
-    auto space_glyph = epd_get_glyph(m_regular_font, ' ');
-    return space_glyph->advance_x;
+    const EpdGlyph *g = epd_get_glyph(NULL, ' ');
+    return g ? g->advance_x : (epd_font_ft_get_size() / 3);
   }
   virtual int get_line_height()
   {
-    return m_regular_font->advance_y;
+    return epd_font_ft_get_line_height();
   }
 
   // dehydate a frame buffer to file

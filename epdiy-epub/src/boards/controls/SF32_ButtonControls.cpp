@@ -33,7 +33,10 @@ void button_event_handler(int32_t pin, button_action_t action)
         {
             action_cbk(UIAction::SELECT); 
         }
-
+        else if (action == BUTTON_LONG_PRESSED)
+        {
+            action_cbk(UIAction::UPGLIDE);
+        }
     }
     else if (pin == EPD_KEY3)
     {
@@ -41,7 +44,6 @@ void button_event_handler(int32_t pin, button_action_t action)
         {
             action_cbk(UIAction::UP); 
         }
-
     }
 #endif
   
@@ -64,7 +66,10 @@ static void adc_button_handler(uint8_t group_idx, int32_t pin, button_action_t b
     if (0 == pin)        action_cbk(UIAction::SELECT);
     else if (1 == pin)   action_cbk(UIAction::DOWN);
   }
-    
+  else if (button_action == BUTTON_LONG_PRESSED)
+  {
+    if (0 == pin)        action_cbk(UIAction::UPGLIDE);
+  }
 }
 
 #endif /* USING_ADC_BUTTON */
@@ -142,7 +147,3 @@ UIAction SF32_ButtonControls::get_deep_sleep_action()
 {
   return UIAction::NONE;
 }
-// void SF32_ButtonControls::setup_deep_sleep()
-// {
-
-// }

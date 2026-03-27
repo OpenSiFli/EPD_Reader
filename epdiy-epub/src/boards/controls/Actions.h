@@ -12,11 +12,12 @@ typedef enum
   PREV_OPTION, // 上一选项（用于列表选择）
   NEXT_OPTION, // 下一选项（用于列表选择）
   SELECT_BOX, // 选择框（用于触控选择）
+  ENTER_READING_SETTINGS, // 从覆盖层进入阅读设置页面
   LAST_INTERACTION,
-  MSG_DRAW_LOW_POWER_PAGE,   
-  MSG_DRAW_CHARGE_PAGE,      
+  MSG_DRAW_LOW_POWER_PAGE,
+  MSG_DRAW_CHARGE_PAGE,
   MSG_DRAW_WELCOME_PAGE,
-  MSG_UPDATE_CHARGE_STATUS     
+  MSG_UPDATE_CHARGE_STATUS
 } UIAction;
 
 typedef std::function<void(UIAction)> ActionCallback_t;

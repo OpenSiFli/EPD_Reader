@@ -1,0 +1,16 @@
+from building import *
+import os
+
+font_objs = []
+cwd = GetCurrentDir()
+font_file = os.path.join(cwd, 'DroidSansFallback.ttf')
+
+if not os.path.exists(font_file):
+    print("Warning: Font file not found: " + font_file)
+    font_objs = []
+else:
+    print("Font file path: " + font_file)
+    font_objs = Env.ConvertFont(font_file, 'epub_ttf_data')
+    font_objs = DefineGroup('font_resource', font_objs, depend = [])
+
+Return('font_objs')
