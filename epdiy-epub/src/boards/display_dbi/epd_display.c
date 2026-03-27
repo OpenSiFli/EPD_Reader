@@ -91,9 +91,6 @@ static uint32_t wait_lcd_ticks;
 static uint16_t epic_out_buffer_idx = 0;
 static uint16_t epic_out_buffer[2][LCD_HOR_RES_MAX];
 static uint32_t lut_copy_ticks;
-
-static int g_part_disp_times = 10;      // After g_part_disp_times-1 partial refreshes, perform a full refresh once
-static int reflesh_times = 0;   // Total number of refreshes performed
 /*
 Define a mixed grey framebuffer on PSRAM
 high 4 bits for old pixel and low 4 bits for new pixel in every byte.
@@ -528,17 +525,10 @@ void epd_load_and_send_pic(LCDC_HandleTypeDef *hlcdc, uint32_t line_type, const 
     }
 }
 
-void set_part_disp_times(int val) 
-{ 
-    g_part_disp_times = val > 0 ? val : 1; 
-    reflesh_times = 1;
-}
-int get_part_disp_times(void) 
-{ 
-    return g_part_disp_times; 
-}
 
 #define PART_DISP_TIMES 10
+static uint32_t reflesh_times = 0;
+
 L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
 {
     uint32_t line, line_bytes;
@@ -567,22 +557,16 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
 
 
     uint8_t temperature = 26;
-    EpdDrawMode mode;
-    if (reflesh_times % g_part_disp_times == 0) 
-    {
-        rt_kprintf("cleared all \n");
-        mode = EPD_DRAW_MODE_FULL;
-    } 
-    else 
-    {
-        rt_kprintf("executing partial refresh, this is the %dth partial refresh (there are %d partial refreshes left until the next full refresh)\n", 
-               (reflesh_times % g_part_disp_times), 
-               g_part_disp_times - (reflesh_times % g_part_disp_times));
-        mode = EPD_DRAW_MODE_PARTIAL;
+
+    if (reflesh_times % PART_DISP_TIMES == 0) {
+        frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_FULL);
+        reflesh_times = 0;
+    } else {
+        frame_times = epd_wave_table_get_frames(temperature, EPD_DRAW_MODE_PARTIAL);
     }
+    reflesh_times++;
 
-    frame_times = epd_wave_table_get_frames(temperature, mode);
-
+    
     CopyToMixedGrayBuffer(hlcdc, RGBCode, Xpos0, Ypos0, Xpos1, Ypos1);
     LOG_I("Convert layer data take=%d(ms) \r\n", rt_tick_get() - start_tick);
 
@@ -688,8 +672,6 @@ L1_RET_CODE_SECT(epd_codes, static void LCD_WriteMultiplePixels(LCDC_HandleTypeD
     LOG_I("Total %d frames, take time=%dms wait_lcd=%d(us), lut_copy=%d(us)\r\n", frame_times,
           rt_tick_get() - start_tick, wait_lcd_ticks / 240,
           lut_copy_ticks / 240);
-
-    reflesh_times++;
 
     EPD_GMODE_L_hs();
     EPD_STV_L_hs();

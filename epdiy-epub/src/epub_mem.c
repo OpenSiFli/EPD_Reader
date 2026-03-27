@@ -3,7 +3,7 @@
 #include <rtthread.h>
 #include "mem_section.h"
 
-#define EPUB_MEMHEAP_POOL_SIZE (2*1024*1024)
+#define EPUB_MEMHEAP_POOL_SIZE (6*1024*1024)
 
 struct rt_memheap epub_psram_memheap;
 
@@ -81,3 +81,31 @@ rt_uint32_t heap_free_size(void)
   
     return  heap_free_size + psram_heap_free_size;
 }
+
+
+/*==========================================================================
+ * FreeType 内存分配适配
+ *========================================================================*/
+#ifdef PKG_FREETYPE
+#include <string.h>
+
+void *ft_smalloc(size_t nbytes)
+{
+    return epub_mem_malloc(nbytes);
+}
+
+void ft_sfree(void *ptr)
+{
+    epub_mem_free(ptr);
+}
+
+void *ft_srealloc(void *ptr, size_t nbytes)
+{
+    return epub_mem_realloc(ptr, nbytes);
+}
+
+void *ft_scalloc(size_t count, size_t size)
+{
+    return epub_mem_calloc(count, size);
+}
+#endif /* PKG_FREETYPE */

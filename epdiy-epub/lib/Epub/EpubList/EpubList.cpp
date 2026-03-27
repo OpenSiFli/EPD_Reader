@@ -1,6 +1,6 @@
 #include "EpubList.h"
 #include <string.h>
-#include "UIRegionsManager.h"
+
 
 
 #ifndef UNIT_TEST
@@ -15,35 +15,47 @@
 static const char *TAG = "PUBLIST";
 
 #define PADDING 20
-#define EPUBS_PER_PAGE 4  
+#define EPUBS_PER_PAGE 5  
+#define BOTTOM_AREA_HEIGHT 50
+#define BOTTOM_AREA_ITEM_INDEX -1  
 
 void EpubList::next()
 {
-  if (state.num_epubs == 0) return;
-  // 正常切换到下一个电子书项
-  if (state.selected_item >= 0 && state.selected_item < state.num_epubs - 1)
-    state.selected_item++;
-  else
+  // 如果当前选中的是最后一个电子书项，则切换到底部区域
+  if (state.selected_item == state.num_epubs - 1) 
+  {
+    state.selected_item = BOTTOM_AREA_ITEM_INDEX;
+  } 
+  else if (state.selected_item == BOTTOM_AREA_ITEM_INDEX) 
+  {
+    // 如果当前已在底部区域，则回到第一个电子书项
     state.selected_item = 0;
+  } 
+  else 
+  {
+    // 正常切换到下一个电子书项
+    state.selected_item = (state.selected_item + 1) % state.num_epubs;
+  }
 }
 
 void EpubList::prev()
 {
-  if (state.num_epubs == 0) return;
-  if (state.selected_item <= 0)
-    state.selected_item = state.num_epubs - 1;
-  else
-    state.selected_item--;
+  if (state.selected_item == 0) 
+  {
+    // 如果当前是第一个电子书项，则切换到底部区域
+    state.selected_item = BOTTOM_AREA_ITEM_INDEX;
+  } 
+  else if (state.selected_item == BOTTOM_AREA_ITEM_INDEX) 
+  {
+    // 如果当前已在底部区域，则切换到最后一个电子书项
+    state.selected_item = state.num_epubs > 0 ? state.num_epubs - 1 : 0;
+  } 
+  else 
+  {
+    // 正常切换到上一个电子书项
+    state.selected_item = (state.selected_item - 1 + state.num_epubs) % state.num_epubs;
+  }
 }
-
-void EpubList::switch_book(int target_index)
-{
-  if (state.num_epubs == 0) return;
-  if (target_index < 0 || target_index >= state.num_epubs)
-    return;
-  state.selected_item = target_index;
-}
-
 
 bool EpubList::load(const char *path)
 {
@@ -134,14 +146,11 @@ bool EpubList::load(const char *path)
 
 void EpubList::render()
 {
-  //clear_areas();
   ulog_d(TAG, "Rendering EPUB list");
   // what page are we on?
   int current_page = state.selected_item / EPUBS_PER_PAGE;
-  // 计算单元格高度，并为底部按钮预留区域与底部间距
-  const int bottom_area_height = 100; // 底部三按钮区域高度
-  const int bottom_margin = 30;       // 与屏幕底部的间距
-  int cell_height = (renderer->get_page_height() - bottom_area_height - bottom_margin) / EPUBS_PER_PAGE;
+  // 计算单元格高度，减去底部区域的高度
+  int cell_height = (renderer->get_page_height() - BOTTOM_AREA_HEIGHT) / EPUBS_PER_PAGE;
   ulog_d(TAG, "Cell height is %d", cell_height);
   int start_index = current_page * EPUBS_PER_PAGE;
   int ypos = 0;
@@ -158,7 +167,6 @@ void EpubList::render()
   }
   for (int i = start_index; i < start_index + EPUBS_PER_PAGE && i < state.num_epubs; i++)
   {
-    
     // do we need to draw a new page of items?
     if (current_page != state.previous_rendered_page)
     {
@@ -193,16 +201,6 @@ void EpubList::render()
         title_block->render(renderer, i, text_xpos, text_ypos + y_offset);
         y_offset += renderer->get_line_height();
       }
-       // 计算整体区域范围
-    int area_start_x = image_xpos;
-    int area_start_y = image_ypos;
-    int area_end_x = std::max(image_xpos + image_width, text_xpos + text_width);
-    int area_end_y = std::max(image_ypos + image_height, text_ypos + title_height);
-    if((i%4)<4)
-    {
-      static_add_area(area_start_x, area_start_y, area_end_x - area_start_x, area_end_y - area_start_y, (i%4));
-    } 
-    
       delete title_block;
       delete epub;
     }
@@ -214,72 +212,92 @@ void EpubList::render()
         renderer->draw_rect(i, ypos + PADDING / 2 + i, renderer->get_page_width() - 2 * i, cell_height - PADDING - 2 * i, 255);
       }
     }
-    // 当不处于底部按钮选择模式时，绘制列表高亮
-    // 若处于底部模式，则擦除列表高亮，避免同时双高亮
-    if (!m_bottom_mode)
+    // draw the selection box around the current selection
+    if (state.selected_item == i)
     {
-      if (state.selected_item == i)
+      for (int i = 0; i < 5; i++)
       {
-        for (int line = 0; line < 5; line++)
-        {
-          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 0);
-        }
-      }
-    }
-    else
-    {
-      if (state.selected_item == i)
-      {
-        // 擦除之前的黑色高亮边框
-        for (int line = 0; line < 5; line++)
-        {
-          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 255);
-        }
+        renderer->draw_rect(i, ypos + PADDING / 2 + i, renderer->get_page_width() - 2 * i, cell_height - PADDING - 2 * i, 0);
       }
     }
     ypos += cell_height;
   }
   state.previous_selected_item = state.selected_item;
   state.previous_rendered_page = current_page;
-  // 绘制底部三按钮区域
-  int page_w = renderer->get_page_width();
-  int page_h = renderer->get_page_height();
-  int area_y = page_h - bottom_area_height - bottom_margin;
-  // 背景
-  renderer->fill_rect(0, area_y, page_w, bottom_area_height, 255);
-  // 三个等宽按钮
-  int btn_gap = 10;
-  int btn_w = (page_w - btn_gap * 4) / 3;
-  int btn_h = 80;
-  int btn_y = area_y + (bottom_area_height - btn_h) / 2;
-  int btn_x0 = btn_gap;                    // 上一页
-  int btn_x1 = btn_gap * 2 + btn_w;        // 主页面
-  int btn_x2 = btn_gap * 3 + btn_w * 2;    // 下一页
+  
+  // touch 开关底部区域
 
-  // 高亮边框：当处于底部模式时，高亮当前选择
-  auto draw_button = [&](int x, const char* text, bool selected)
+  int screen_height = renderer->get_page_height();
+  int bottom_area_y = screen_height - BOTTOM_AREA_HEIGHT - 11;  
+
+
+  int original_width = renderer->get_page_width() - 2 * PADDING;
+  int rect_width = original_width * 2 / 3; 
+  int rect_x = PADDING + (original_width - rect_width) / 2; 
+
+  int rect_height = BOTTOM_AREA_HEIGHT; 
+
+  if (bottom_area_y < 0) 
   {
-    if (selected)
-    {
-      // 加粗描边，表示选中
-      for (int i = 0; i < 5; ++i)
-      {
-        renderer->draw_rect(x + i, btn_y + i, btn_w - 2 * i, btn_h - 2 * i, 0);
-      }
-    }
-    else
-    {
-      // 非选中用细描边
-      renderer->draw_rect(x, btn_y, btn_w, btn_h, 80);
-    }
-    int t_w = renderer->get_text_width(text);
-    int t_h = renderer->get_line_height();
-    int tx = x + (btn_w - t_w) / 2;
-    int ty = btn_y + (btn_h - t_h) / 2;
-    renderer->draw_text(tx, ty, text, false, true);
-  };
+      bottom_area_y = 5; 
+      rect_height = BOTTOM_AREA_HEIGHT;
+  }
 
-  draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
-  draw_button(btn_x1, "主页面", m_bottom_mode && m_bottom_idx == 1);
-  draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
+
+  renderer->fill_rect(rect_x, bottom_area_y, rect_width, rect_height, 255);
+
+  bool touch_state = touch_controls ? touch_controls->isTouchEnabled() : false;
+  const char* text = touch_state ? "Touch : On" : "Touch : Off";
+
+  int text_height = renderer->get_line_height();
+  int text_y = bottom_area_y + (rect_height - text_height) / 2;
+
+  if (text_y < bottom_area_y + 2) 
+  {
+      text_y = bottom_area_y + 2;
+  }
+  if (text_y + text_height > bottom_area_y + rect_height - 2) 
+  {
+      text_y = bottom_area_y + rect_height - text_height - 2;
+  }
+
+  int text_length = strlen(text);
+  int estimated_text_width = text_length * 12; 
+  int text_x = rect_x + (rect_width - estimated_text_width) / 2; 
+
+
+  if (text_x < rect_x + 5) 
+  {
+      text_x = rect_x + 5;
+  }
+  if (text_x + estimated_text_width > rect_x + rect_width - 5) 
+  {
+      text_x = rect_x + rect_width - estimated_text_width - 5;
+  }
+
+  renderer->draw_text(text_x, text_y, text, 0);
+
+  if (state.selected_item == BOTTOM_AREA_ITEM_INDEX) 
+  {
+      int border_thickness = 3;  
+      for (int i = 0; i < border_thickness; i++) 
+      {
+          renderer->draw_rect(rect_x + i, bottom_area_y + i, 
+                          rect_width - 2 * i, 
+                          rect_height - 2 * i, 0);
+      }
+  } 
+  else 
+  {
+      if (state.previous_selected_item == BOTTOM_AREA_ITEM_INDEX) 
+      {
+          int border_thickness = 3;
+          for (int i = 0; i < border_thickness; i++) 
+          {
+              renderer->draw_rect(rect_x + i, bottom_area_y + i, 
+                                rect_width - 2 * i, 
+                                rect_height - 2 * i, 255);
+          }
+      }
+  }
 }

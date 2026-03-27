@@ -49,12 +49,12 @@ if !BSP_USING_BUILT_LCD
 		bool
 		default n
 
+
 	choice
 		prompt "Custom LCD driver"
 		default LCD_USING_EPD_YZC085_V100 if BSP_USING_BOARD_SF32_OED_EPD_V11
 		default LCD_USING_EPD_YZC085_V100_V12 if BSP_USING_BOARD_SF32_OED_EPD_V12
 		
-
 		config LCD_USING_EPD_YZC085_V100_V12
 			bool "6.0 rect electronic paper display(EPD YZC085_V1.05 1032x758) for V1.2 board"
 			select TSC_USING_GT967 if BSP_USING_TOUCHD

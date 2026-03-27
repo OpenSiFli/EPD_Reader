@@ -1,5 +1,4 @@
 #include "EpubToc.h"
-#include "UIRegionsManager.h"
 
 static const char *TAG = "PUBINDEX";
 #define PADDING 14
@@ -32,15 +31,6 @@ void EpubToc::prev()
   }
   state.selected_item = (state.selected_item - 1 + epub->get_toc_items_count()) % epub->get_toc_items_count();
 }
-void EpubToc::switch_book(int target_index)
-{
-  if (!epub)
-  {
-    load();
-  }
-  state.selected_item = target_index % epub->get_toc_items_count();
-
-}
 
 bool EpubToc::load()
 {
@@ -67,17 +57,13 @@ bool EpubToc::load()
 // required as we're not rendering thumbnails
 void EpubToc::render()
 {
-  // 初始化固定区域（仅首次调用）
   ulog_d(TAG, "Rendering EPUB index");
   // what page are we on?
   int current_page = state.selected_item / ITEMS_PER_PAGE;
-  // 为底部按钮预留区域与底部间距
-  const int bottom_area_height = 100;
-  const int bottom_margin = 30;
-  int cell_height = (renderer->get_page_height() - bottom_area_height - bottom_margin) / ITEMS_PER_PAGE;
+  // show five items per page
+  int cell_height = renderer->get_page_height() / ITEMS_PER_PAGE;
   int start_index = current_page * ITEMS_PER_PAGE;
   int ypos = 0;
-
   // starting a fresh page or rendering from scratch?
   ulog_i(TAG, "Current page is %d, previous page %d, redraw=%d", current_page, state.previous_rendered_page, m_needs_redraw);
   if (current_page != state.previous_rendered_page || m_needs_redraw)
@@ -111,16 +97,6 @@ void EpubToc::render()
       }
       // clean up the temporary index block
       delete title_block;
-      // 计算整体区域范围并写入
-      int area_start_x = 0;
-      int area_start_y = ypos + PADDING / 2;
-      int area_end_x = renderer->get_page_width();
-      int area_end_y = ypos + cell_height - PADDING / 2;
-
-        if ((i % ITEMS_PER_PAGE) < ITEMS_PER_PAGE)
-        {
-            static_add_area(area_start_x, area_start_y, area_end_x - area_start_x, area_end_y - area_start_y, (i % ITEMS_PER_PAGE));
-        }
     }
     // clear the selection box around the previous selected item
     if (state.previous_selected_item == i)
@@ -130,72 +106,18 @@ void EpubToc::render()
         renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 255);
       }
     }
-    // 目录页：仅在非底部按钮模式时显示列表高亮；底部模式下擦除列表高亮
-    if (!m_bottom_mode)
+    // draw the selection box around the current selection
+    if (state.selected_item == i)
     {
-      if (state.selected_item == i)
+      for (int line = 0; line < 3; line++)
       {
-        for (int line = 0; line < 3; line++)
-        {
-          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 0);
-        }
-      }
-    }
-    else
-    {
-      if (state.selected_item == i)
-      {
-        for (int line = 0; line < 3; line++)
-        {
-          renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 255);
-        }
+        renderer->draw_rect(line, ypos + PADDING / 2 + line, renderer->get_page_width() - 2 * line, cell_height - PADDING - 2 * line, 0);
       }
     }
     ypos += cell_height;
   }
   state.previous_selected_item = state.selected_item;
   state.previous_rendered_page = current_page;
-
-  // 绘制底部三按钮区域
-  int page_w = renderer->get_page_width();
-  int page_h = renderer->get_page_height();
-  int area_y = page_h - bottom_area_height - bottom_margin;
-  // 背景
-  renderer->fill_rect(0, area_y, page_w, bottom_area_height, 255);
-  // 三个等宽按钮
-  int btn_gap = 10;
-  int btn_w = (page_w - btn_gap * 4) / 3; // 左右边距各一个gap，再加中间两个gap
-  int btn_h = 80;
-  int btn_y = area_y + (bottom_area_height - btn_h) / 2;
-  int btn_x0 = btn_gap;                    // 上一页
-  int btn_x1 = btn_gap * 2 + btn_w;        // 主页面
-  int btn_x2 = btn_gap * 3 + btn_w * 2;    // 下一页
-
-  auto draw_button = [&](int x, const char* text, bool selected)
-  {
-    if (selected)
-    {
-      // 多重描边（黑色），与列表选中效果一致
-      for (int i = 0; i < 5; ++i)
-      {
-        renderer->draw_rect(x + i, btn_y + i, btn_w - 2 * i, btn_h - 2 * i, 0);
-      }
-    }
-    else
-    {
-      // 非选中用细描边（灰色）
-      renderer->draw_rect(x, btn_y, btn_w, btn_h, 80);
-    }
-    int t_w = renderer->get_text_width(text);
-    int t_h = renderer->get_line_height();
-    int tx = x + (btn_w - t_w) / 2;
-    int ty = btn_y + (btn_h - t_h) / 2;
-    renderer->draw_text(tx, ty, text, false, true);
-  };
-
-  draw_button(btn_x0, "上一页", m_bottom_mode && m_bottom_idx == 0);
-  draw_button(btn_x1, "书库", m_bottom_mode && m_bottom_idx == 1);
-  draw_button(btn_x2, "下一页", m_bottom_mode && m_bottom_idx == 2);
 }
 
 uint16_t EpubToc::get_selected_toc()

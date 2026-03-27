@@ -14,8 +14,7 @@ void button_event_handler(int32_t pin, button_action_t action)
       }
       else if (action == BUTTON_LONG_PRESSED)
       {
-          rt_kprintf("长按   1");
-          action_cbk(UIAction::UPGLIDE);
+          action_cbk(UIAction::LONG_SELECT);
       }
   }
 #else
@@ -33,7 +32,10 @@ void button_event_handler(int32_t pin, button_action_t action)
         {
             action_cbk(UIAction::SELECT); 
         }
-
+        else if (action == BUTTON_LONG_PRESSED)
+        {
+            action_cbk(UIAction::LONG_SELECT);
+        }
     }
     else if (pin == EPD_KEY3)
     {
@@ -41,7 +43,6 @@ void button_event_handler(int32_t pin, button_action_t action)
         {
             action_cbk(UIAction::UP); 
         }
-
     }
 #endif
   
@@ -64,7 +65,10 @@ static void adc_button_handler(uint8_t group_idx, int32_t pin, button_action_t b
     if (0 == pin)        action_cbk(UIAction::SELECT);
     else if (1 == pin)   action_cbk(UIAction::DOWN);
   }
-    
+  else if (button_action == BUTTON_LONG_PRESSED)
+  {
+    if (0 == pin)        action_cbk(UIAction::LONG_SELECT);  // K2 长按进设置
+  }
 }
 
 #endif /* USING_ADC_BUTTON */

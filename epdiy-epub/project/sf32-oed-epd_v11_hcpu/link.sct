@@ -137,7 +137,7 @@ LR_IROM1 CODE_START_ADDR CODE_SIZE  {    ; load region size_region
     ZipFile.o (+RO)
 	miniz.o (+RO)
 	tjpgd.o (+RO)
-	font.o (+RO)
+	font_ft.o (+RO)
 #endif
 
 }
@@ -152,6 +152,6 @@ LR_IROM1 CODE_START_ADDR CODE_SIZE  {    ; load region size_region
 
 LR_IROM2 BUILTIN_RESOURCE_START_ADDR BUILTIN_RESOURCE_SIZE  {  ; load region size_region
   ER_IROM2 BUILTIN_RESOURCE_START_ADDR BUILTIN_RESOURCE_SIZE  {  ; RW data
-   epub_fonts.o  (.rodata.*)
+   epub_ttf_data.o (.font_data)
    }
 }

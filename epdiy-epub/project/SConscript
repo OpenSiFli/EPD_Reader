@@ -12,5 +12,7 @@ objs.extend(SConscript(os.path.join(SIFLI_SDK, 'SConscript'), variant_dir="sifli
 # Add application source code
 objs.extend(SConscript(cwd+'/../lib/SConscript', variant_dir="lib", duplicate=0))
 objs.extend(SConscript(cwd+'/../src/SConscript', variant_dir="src", duplicate=0))
+# 字体自动转换
+objs.extend(SConscript(cwd+'/../font/SConscript', variant_dir="font", duplicate=0))
 
 Return('objs')
