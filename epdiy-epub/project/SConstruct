@@ -16,6 +16,8 @@ PrepareEnv()
 # Add bootloader project
 AddBootLoader(SIFLI_SDK,rtconfig.CHIP)
 
+# Add LCPU project
+AddLCPU(SIFLI_SDK,rtconfig.CHIP,"../../src/lcpu_img.c")
 # Set default compile options
 SifliEnv()
 

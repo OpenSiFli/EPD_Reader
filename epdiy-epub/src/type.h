@@ -6,8 +6,9 @@ typedef enum {
   SET_TOUCH = 0, 
   SET_TIMEOUT = 1, 
   SET_FULL_REFRESH = 2, 
-  SET_READING_SETTINGS = 3,  // 阅读设置（字体/字号/行距/边距）
-  SET_CONFIRM = 4 
+  SET_BLUETOOTH = 3,
+  SET_READING_SETTINGS = 4,  // 阅读设置（字体/字号/行距/边距）
+  SET_CONFIRM = 5 
 } SettingsItem;
 
 typedef enum {
@@ -17,6 +18,8 @@ typedef enum {
   READING_EPUB,        // 阅读页面
   READING_SETTINGS,    // 阅读设置页面（字体/字号/行距/边距）
   SETTINGS_PAGE,       // 通用功能设置页面
+  WEATHER_PAGE,        // 查看天气页面
+  WEATHER_CITY_PAGE,   // 天气城市选择页面
   WELCOME_PAGE,        // 欢迎页面
   LOW_POWER_PAGE,      // 低电量页面
   CHARGING_PAGE,       // 充电页面

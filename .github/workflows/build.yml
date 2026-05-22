@@ -19,6 +19,8 @@ jobs:
       matrix:
         target: 
           - sf32-oed-epd_v11
+          - sf32-oed-epd_v12
+          - sf32-oed-epd_v12_spi
       fail-fast: false
     
     name: Build ${{ matrix.target }}
