@@ -14,7 +14,7 @@
 #include "epd_driver.h"
 #include "type.h"
 #include "reading_settings.h"
-
+#include "ulog.h"
 #include "UIRegionsManager.h"
 
 #undef LOG_TAG
@@ -28,6 +28,7 @@
 
 extern "C"
 {
+  #include "pan.h"
   int main();
   rt_uint32_t heap_free_size(void);
   extern void set_part_disp_times(int val);
@@ -35,6 +36,10 @@ extern "C"
   extern const uint8_t chargeing_map[];
   extern const uint8_t welcome_map[];
   extern const uint8_t shutdown_map[];
+  extern const uint32_t bluetooth_icon_width;
+  extern const uint32_t bluetooth_icon_height;
+  extern const uint8_t bluetooth_connected_map[];
+  extern const uint8_t bluetooth_disconnected_map[];
   // FreeType 相关
   extern const unsigned char epub_ttf_data[];
   extern const int epub_ttf_data_size;
@@ -64,10 +69,29 @@ static int g_anchor_block = 0;
 static int g_anchor_line = 0;
 static bool g_has_anchor = false;
 static AppUIState g_state_before_settings = MAIN_PAGE;
+static volatile int g_pan_init_state = 0;
+
+static void pan_init_thread_entry(void *parameter)
+{
+  const char *local_name = (const char *)parameter;
+  rt_err_t result = pan_service_init(local_name, RT_FALSE);
+  if (result != RT_EOK)
+  {
+    g_pan_init_state = 0;
+    ulog_w("main", "PAN service init failed: %d", result);
+    return;
+  }
+
+  g_pan_init_state = 2;
+  if (!bluetooth_ui_enabled)
+    pan_service_set_enabled(RT_FALSE);
+}
 
 void handleEpub(Renderer *renderer, UIAction action);
 void handleEpubList(Renderer *renderer, UIAction action, bool needs_redraw);
 void back_to_main_page();
+void draw_status_bar(Renderer *renderer, Battery *battery);
+void draw_bluetooth_status(Renderer *renderer, bool enabled, bool connected);
 
 static EpubList *epub_list = nullptr;
 EpubReader *reader = nullptr;
@@ -93,12 +117,6 @@ int sel;
 int touch_sel;
 rt_mq_t ui_queue = RT_NULL;
 
-// 主页面选项
-typedef enum {
-  OPTION_OPEN_LIBRARY = 0,   // 打开书库 -> 打印 1
-  OPTION_CONTINUE_READING,   // 继续阅读 -> 打印 2
-  OPTION_ENTER_SETTINGS      // 进入设置 -> 打印 3
-} MainOption;
 void handleEpubTableContents(Renderer *renderer, UIAction action, bool needs_redraw);
 
 
@@ -676,12 +694,45 @@ void draw_charge_status(Renderer *renderer, Battery *battery)
     if (battery->is_charging()) 
     {
       draw_lightning(renderer, xpos + icon_size/2, ypos + icon_size/2, icon_size);
-    } 
-    else 
-    {
-      clear_charge_icon(renderer);
     }
 }
+
+void draw_status_bar(Renderer *renderer, Battery *battery)
+{
+  // renderer->fill_rect(0, 0, renderer->get_page_width(), 35, 255);
+  draw_bluetooth_status(renderer, bluetooth_ui_enabled, g_bluetooth_connected != 0);
+  if (battery)
+  {
+    draw_charge_status(renderer, battery);
+    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
+  }
+}
+
+// 蓝牙状态图标：仅在蓝牙 UI 开启时显示
+void draw_bluetooth_status(Renderer *renderer, bool enabled, bool connected)
+{
+  int battery_width = 40;
+  int charge_icon_size = 30;
+  int charge_margin_right = 0;
+  int charge_margin_top = 3;
+  int charge_x = renderer->get_page_width() - battery_width - charge_margin_right - charge_icon_size - 4;
+  int xpos = charge_x - (int)bluetooth_icon_width - 3;
+  int ypos = charge_margin_top + ((charge_icon_size - (int)bluetooth_icon_height) / 2) +2;
+
+  if (!enabled)
+  {
+    // show_img 不加 margin 偏移，用全白 buffer 覆盖图标区域以清除旧图标
+    static uint8_t white_buf[(24 * 24) / 2];
+    static bool white_init = false;
+    if (!white_init) { memset(white_buf, 0xFF, sizeof(white_buf)); white_init = true; }
+    renderer->show_img(xpos, ypos, (int)bluetooth_icon_width, (int)bluetooth_icon_height, white_buf);
+    return;
+  }
+
+  const uint8_t *icon = connected ? bluetooth_connected_map : bluetooth_disconnected_map;
+  renderer->show_img(xpos, ypos, (int)bluetooth_icon_width, (int)bluetooth_icon_height, icon);
+}
+
 
 void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_redraw)
 {
@@ -696,7 +747,7 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
     {
     case MAIN_PAGE:
       handleMainPage(renderer, ui_action, needs_redraw);
-      if (ui_action == SELECT && screen_get_main_selected_option() == 2)
+      if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_ENTER_SETTINGS)
       {
         ui_state = SETTINGS_PAGE;
         int r = handleSettingsPage(renderer, NONE, true);
@@ -706,7 +757,12 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
           reading_settings_draw(renderer);
         }
       }
-      else if (ui_action == SELECT && screen_get_main_selected_option() == 1)
+      else if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_WEATHER)
+      {
+        ui_state = WEATHER_PAGE;
+        (void)handleWeatherPage(renderer, NONE, true);
+      }
+      else if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_CONTINUE_READING)
       {
         if (!(g_last_read_index >= 0 && g_last_read_index < epub_list_state.num_epubs)) {
           return;
@@ -720,7 +776,7 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
         ui_state = READING_EPUB;
         handleEpub(renderer, NONE);
       }
-      else if (ui_action == SELECT && screen_get_main_selected_option() == 0)
+      else if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_OPEN_LIBRARY)
       {
         ui_state = SELECTING_EPUB;
         handleEpubList(renderer, NONE, true);      
@@ -753,6 +809,31 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
         }
         return;
     }
+      case WEATHER_PAGE:
+      {
+        int r = handleWeatherPage(renderer, ui_action, needs_redraw);
+        if (r == 1)
+        {
+          ui_state = MAIN_PAGE;
+          handleMainPage(renderer, NONE, true);
+        }
+        else if (r == 2)
+        {
+          ui_state = WEATHER_CITY_PAGE;
+          (void)handleWeatherCityPage(renderer, NONE, true);
+        }
+        break;
+      }
+    case WEATHER_CITY_PAGE:
+      {
+        int r = handleWeatherCityPage(renderer, ui_action, needs_redraw);
+        if (r == 1 || r == 2)
+        {
+          ui_state = WEATHER_PAGE;
+          (void)handleWeatherPage(renderer, NONE, true);
+        }
+        break;
+      }
     case SELECTING_TABLE_CONTENTS:
         handleEpubTableContents(renderer, ui_action, needs_redraw);
         break;
@@ -782,6 +863,13 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
     rt_kprintf("Renderer time=%d \r\n", rt_tick_get() - start_tick);
 }
 
+// 统一刷屏入口：按历史行为直接同步 flush 当前帧缓冲
+static void request_flush(void)
+{
+  if (renderer)
+    renderer->flush_display();
+}
+
 const char* getCurrentPageName() {
   switch (ui_state) 
   {
@@ -791,6 +879,8 @@ const char* getCurrentPageName() {
     case READING_EPUB:  return "READING_EPUB";
     case READING_SETTINGS: return "READING_SETTINGS";
     case SETTINGS_PAGE: return "SETTINGS_PAGE";
+    case WEATHER_PAGE: return "WEATHER_PAGE";
+    case WEATHER_CITY_PAGE: return "WEATHER_CITY_PAGE";
     case WELCOME_PAGE:  return "WELCOME_PAGE";
     case LOW_POWER_PAGE: return "LOW_POWER_PAGE";
     case CHARGING_PAGE: return "CHARGING_PAGE";
@@ -822,13 +912,9 @@ void back_to_main_page()
   ui_state = MAIN_PAGE;
   handleUserInteraction(renderer, NONE, true);
 
-  if (battery)
-  {
-    draw_charge_status(renderer, battery);
-    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-  }
+  draw_status_bar(renderer, battery);
   touch_controls->render(renderer);
-  renderer->flush_display();
+  request_flush();
 }
 
 void draw_welcome_page(Battery *battery)
@@ -836,17 +922,14 @@ void draw_welcome_page(Battery *battery)
   if (ui_state == WELCOME_PAGE) return;
   ui_state = WELCOME_PAGE;
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 0);
-  if (battery) {
-    renderer->set_margin_top(35);
-    draw_charge_status(renderer, battery);
-    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-  }
+  renderer->set_margin_top(35);
+  draw_status_bar(renderer, battery);
   const int img_width = 649, img_height = 150;
   int center_x = renderer->get_page_width() / 2;
   int center_y = 35 + (renderer->get_page_height() - 35) / 2;
   EpdiyFrameBufferRenderer* fb_renderer = static_cast<EpdiyFrameBufferRenderer*>(renderer);
   fb_renderer->show_img(center_x - img_width / 2, center_y - img_height / 2, img_width, img_height, welcome_map);
-  renderer->flush_display();
+  request_flush();
 }
 
 void draw_low_power_page(Battery *battery)
@@ -854,17 +937,14 @@ void draw_low_power_page(Battery *battery)
   if (ui_state == LOW_POWER_PAGE) return;
   ui_state = LOW_POWER_PAGE;
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 0);
-  if (battery) {
-    renderer->set_margin_top(35);
-    draw_charge_status(renderer, battery);
-    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-  }
+  renderer->set_margin_top(35);
+  draw_status_bar(renderer, battery);
   const int img_width = 200, img_height = 200;
   int center_x = renderer->get_page_width() / 2;
   int center_y = 35 + (renderer->get_page_height() - 35) / 2;
   EpdiyFrameBufferRenderer* fb_renderer = static_cast<EpdiyFrameBufferRenderer*>(renderer);
   fb_renderer->show_img(center_x - img_width / 2, center_y - img_height / 2, img_width, img_height, low_power_map);
-  renderer->flush_display();
+  request_flush();
 }
 
 void draw_charge_page(Battery *battery)
@@ -872,28 +952,21 @@ void draw_charge_page(Battery *battery)
   if (ui_state == CHARGING_PAGE) return;
   ui_state = CHARGING_PAGE;
   renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 0);
-  if (battery) {
-    renderer->set_margin_top(35);
-    draw_charge_status(renderer, battery);
-    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-  }
+  renderer->set_margin_top(35);
+  draw_status_bar(renderer, battery);
   const int img_width = 200, img_height = 200;
   int center_x = renderer->get_page_width() / 2;
   int center_y = 35 + (renderer->get_page_height() - 35) / 2;
   EpdiyFrameBufferRenderer* fb_renderer = static_cast<EpdiyFrameBufferRenderer*>(renderer);
   fb_renderer->show_img(center_x - img_width / 2, center_y - img_height / 2, img_width, img_height, chargeing_map);
-  renderer->flush_display();
+  request_flush();
 }
 
 void draw_shutdown_page()
 {
     renderer->fill_rect(0, 0, renderer->get_page_width(), renderer->get_page_height(), 255);
-    if (battery) 
-    {
-        renderer->set_margin_top(35);
-        draw_charge_status(renderer, battery);
-        draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-    }
+    renderer->set_margin_top(35);
+    draw_status_bar(renderer, battery);
     const int img_width = 200, img_height = 200;
     int center_x = renderer->get_page_width() / 2;
     int center_y = 35 + (renderer->get_page_height() - 35) / 2;
@@ -948,6 +1021,7 @@ void main_task(void *param)
   ::touch_controls = board->get_touch_controls(renderer, ui_queue);
 
   ulog_i("main", "Controls configured");
+
   if (button_controls->did_wake_from_deep_sleep())
   {
     bool hydrate_success = renderer->hydrate();
@@ -961,13 +1035,9 @@ void main_task(void *param)
     handleUserInteraction(renderer, NONE, true);
   }
 
-  if (battery)
-  {
-    draw_charge_status(renderer, battery);
-    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-  }
+  draw_status_bar(renderer, battery);
   touch_controls->render(renderer);
-  renderer->flush_display();
+  request_flush();
   if(!touch_controls->isTouchEnabled())
   {
     touch_controls->powerOffTouch();
@@ -976,6 +1046,9 @@ void main_task(void *param)
   rt_tick_t last_user_interaction = rt_tick_get_millisecond();
   int last_battery_percent = battery ? battery->get_percentage() : -1;
   bool last_battery_charging = battery ? battery->is_charging() : false;
+  bool last_bluetooth_ui_enabled = bluetooth_ui_enabled;
+  g_bluetooth_connected = pan_service_is_bt_connected() ? 1 : 0;
+  int last_bluetooth_connected = g_bluetooth_connected;
 
   screen_init(TIMEOUT_SHUTDOWN_TIME);
 
@@ -1004,7 +1077,7 @@ void main_task(void *param)
             if (percentage >= 98 && charge_full == false) 
             {
                 clear_charge_icon(renderer);
-                renderer->flush_display();
+                request_flush();
                 charge_full = true;
                 rt_kprintf("Battery level is full, skip sending charge status update message\n");
             }
@@ -1012,9 +1085,8 @@ void main_task(void *param)
             {
                 rt_kprintf("Charge status changed\n");
                 charge_full = false;
-                draw_charge_status(renderer, battery);
-                draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
-                renderer->flush_display();
+              draw_status_bar(renderer, battery);
+                request_flush();
             }        
         }
         continue;
@@ -1076,13 +1148,74 @@ void main_task(void *param)
       }         
       touch_controls->render(renderer);
       // 用户操作或电池UI消息后，立即刷屏
+      // 注意：蓝牙 toggle 处理放在 flush 之前，确保一次刷屏就显示最新状态
+      if (bluetooth_pending_toggle)
+      {
+        rt_err_t toggle_result = RT_EOK;
+
+        renderer->show_busy();
+        bool new_bluetooth_state = !bluetooth_ui_enabled;
+        if (new_bluetooth_state)
+        {
+          if (g_pan_init_state == 0)
+          {
+             rt_thread_t pan_init_thread = rt_thread_create("pan_init",
+                                                           pan_init_thread_entry,
+                                                           (void *)"EPD_Reader",
+                                                           8192,
+                                                           18,
+                                                           20);
+
+              if (pan_init_thread == RT_NULL)
+              {
+                toggle_result = -RT_ENOMEM;
+              }
+              else
+              {
+                g_pan_init_state = 1;
+                rt_thread_startup(pan_init_thread);
+                // 给 PAN 初始化线程一些缓冲时间，避免立即与其他线程发生长时间竞争
+                rt_thread_mdelay(5);
+              }
+          }
+          else
+          {
+            toggle_result = pan_service_set_enabled(RT_TRUE);
+          }
+        }
+        else
+        {
+          if (g_pan_init_state == 2)
+            toggle_result = pan_service_set_enabled(RT_FALSE);
+          g_bluetooth_connected = 0;
+          last_bluetooth_connected = 0;
+        }
+
+        if (toggle_result != RT_EOK)
+        {
+          ulog_w("main", "PAN async init start failed: %d", toggle_result);
+        }
+        else
+        {
+          bluetooth_ui_enabled = new_bluetooth_state;
+          last_bluetooth_ui_enabled = new_bluetooth_state;
+          if (!new_bluetooth_state)
+          {
+            g_bluetooth_connected = 0;
+            last_bluetooth_connected = 0;
+          }
+        }
+
+        bluetooth_pending_toggle = false;
+        if (ui_state == SETTINGS_PAGE)
+          (void)handleSettingsPage(renderer, NONE, true);
+      }
+      draw_status_bar(renderer, battery);
       if (battery) {
-        draw_charge_status(renderer, battery);
-        draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
         last_battery_percent = battery->get_percentage();
         last_battery_charging = battery->is_charging();
       }
-      renderer->flush_display();
+      request_flush();
 
     } else {
       // ============================================================
@@ -1101,6 +1234,15 @@ void main_task(void *param)
       }
     }
 
+    int current_bluetooth_connected = pan_service_is_bt_connected() ? 1 : 0;
+    if (current_bluetooth_connected != last_bluetooth_connected)
+    {
+      g_bluetooth_connected = current_bluetooth_connected;
+      draw_status_bar(renderer, battery);
+      request_flush();
+      last_bluetooth_connected = current_bluetooth_connected;
+    }
+
     // 电池状态 + 刷屏（仅在电量百分比或充电状态变化时才刷新）
     if (battery) {
       int cur_percent = battery->get_percentage();
@@ -1109,13 +1251,14 @@ void main_task(void *param)
         ulog_i("main", "Battery changed: %d%%->%d%%, charging=%d->%d",
                last_battery_percent, cur_percent,
                last_battery_charging, cur_charging);
-        draw_charge_status(renderer, battery);
-        draw_battery_level(renderer, battery->get_voltage(), cur_percent);
-        renderer->flush_display();
+        draw_status_bar(renderer, battery);
+        request_flush();
         last_battery_percent = cur_percent;
         last_battery_charging = cur_charging;
       }
     }
+    // 每次主循环迭代末尾短暂延时，给予低优先级线程机会运行，避免互相饿死
+    rt_thread_mdelay(50);
   }
 
   ulog_i("main", "Saving state");

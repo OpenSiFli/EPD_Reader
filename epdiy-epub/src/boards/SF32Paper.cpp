@@ -101,7 +101,7 @@ void SF32Paper::power_up()
             RT_ASSERT(0);
         }
     }
-    HAL_LPAON_Sleep();
+ 
     if (epd_font_ft_init_builtin(32) != 0) {
         rt_kprintf("ERROR: Vector font init failed!\n");
     }

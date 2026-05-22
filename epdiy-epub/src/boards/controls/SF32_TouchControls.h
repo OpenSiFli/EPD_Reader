@@ -34,3 +34,7 @@ public:
 extern volatile int g_touch_last_settings_row;
 // 方向：-1=左(减)，+1=右(加)，0=无
 extern volatile int g_touch_last_settings_dir;
+// 最近一次天气页按钮按下：-1=无，0=城市选择，1=返回，2=更新
+extern volatile int g_weather_last_button;
+// 最近一次城市选择页触摸区域：-1=无，0-3=城市项，4=返回，5=确认
+extern volatile int g_weather_city_last_hit;

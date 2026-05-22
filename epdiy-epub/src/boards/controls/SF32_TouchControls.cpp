@@ -15,6 +15,8 @@
 
 volatile int g_touch_last_settings_row = -1;
 volatile int g_touch_last_settings_dir = 0;
+volatile int g_weather_last_button = -1;
+volatile int g_weather_city_last_hit = -1;
 extern int settings_selected_idx;
 extern AppUIState ui_state;
 extern int book_index;
@@ -114,6 +116,39 @@ switch (ui_state)
     {
       action = SELECT;
       rt_kprintf("Touch middle SELECT \n");
+    }
+    break;
+  case WEATHER_PAGE:
+    if (x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y)
+    {
+      g_weather_last_button = 0; // top: city select
+      action = SELECT;
+      rt_kprintf("Touch weather top button (city select)\n");
+    }
+    else if (x >= g_area_array[1].start_x && x <= g_area_array[1].end_x && y >= g_area_array[1].start_y && y <= g_area_array[1].end_y)
+    {
+      g_weather_last_button = 1; // left: back
+      action = SELECT;
+      rt_kprintf("Touch weather left button (back)\n");
+    }
+    else if (x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y)
+    {
+      g_weather_last_button = 2; // right: refresh
+      action = SELECT;
+      rt_kprintf("Touch weather right button (refresh)\n");
+    }
+    break;
+  case WEATHER_CITY_PAGE:
+    for (int city_hit = 0; city_hit < 6; ++city_hit)
+    {
+      if (x >= g_area_array[city_hit].start_x && x <= g_area_array[city_hit].end_x &&
+          y >= g_area_array[city_hit].start_y && y <= g_area_array[city_hit].end_y)
+      {
+        g_weather_city_last_hit = city_hit;
+        action = SELECT;
+        rt_kprintf("Touch weather city item: %d\n", city_hit);
+        break;
+      }
     }
     break;
   case SELECTING_EPUB:
@@ -269,23 +304,33 @@ switch (ui_state)
     }
     break;
   case SETTINGS_PAGE:
-    if (x >= g_area_array[2].start_x && x <= g_area_array[2].end_x && y >= g_area_array[2].start_y && y <= g_area_array[2].end_y)
+    if (x >= g_area_array[SET_TOUCH * 3 + 2].start_x && x <= g_area_array[SET_TOUCH * 3 + 2].end_x &&
+        y >= g_area_array[SET_TOUCH * 3 + 2].start_y && y <= g_area_array[SET_TOUCH * 3 + 2].end_y)
     {
       settings_selected_idx = SET_TOUCH;
       action = SELECT_BOX;
       rt_kprintf("select touch switch\n");
     }
-    else if (x >= g_area_array[5].start_x && x <= g_area_array[5].end_x && y >= g_area_array[5].start_y && y <= g_area_array[5].end_y)
+    else if (x >= g_area_array[SET_TIMEOUT * 3 + 2].start_x && x <= g_area_array[SET_TIMEOUT * 3 + 2].end_x &&
+             y >= g_area_array[SET_TIMEOUT * 3 + 2].start_y && y <= g_area_array[SET_TIMEOUT * 3 + 2].end_y)
     {
       settings_selected_idx = SET_TIMEOUT;
       action = SELECT_BOX;  
       rt_kprintf("select timeout switch\n");
     }
-    else if (x >= g_area_array[8].start_x && x <= g_area_array[8].end_x && y >= g_area_array[8].start_y && y <= g_area_array[8].end_y)
+    else if (x >= g_area_array[SET_FULL_REFRESH * 3 + 2].start_x && x <= g_area_array[SET_FULL_REFRESH * 3 + 2].end_x &&
+             y >= g_area_array[SET_FULL_REFRESH * 3 + 2].start_y && y <= g_area_array[SET_FULL_REFRESH * 3 + 2].end_y)
     {
       settings_selected_idx = SET_FULL_REFRESH;
       action = SELECT_BOX;  
       rt_kprintf("select full refresh switch \n");
+    }
+    else if (x >= g_area_array[SET_BLUETOOTH * 3 + 2].start_x && x <= g_area_array[SET_BLUETOOTH * 3 + 2].end_x &&
+             y >= g_area_array[SET_BLUETOOTH * 3 + 2].start_y && y <= g_area_array[SET_BLUETOOTH * 3 + 2].end_y)
+    {
+      settings_selected_idx = SET_BLUETOOTH;
+      action = SELECT_BOX;
+      rt_kprintf("select bluetooth switch\n");
     }
     else if (x >= g_area_array[SET_READING_SETTINGS * 3 + 2].start_x && x <= g_area_array[SET_READING_SETTINGS * 3 + 2].end_x &&
              y >= g_area_array[SET_READING_SETTINGS * 3 + 2].start_y && y <= g_area_array[SET_READING_SETTINGS * 3 + 2].end_y)
@@ -302,29 +347,39 @@ switch (ui_state)
       rt_kprintf("select confirm button\n");
     }
 
-    if(settings_selected_idx == SET_TOUCH && g_area_array[0].start_x<=x && x<= g_area_array[0].end_x && g_area_array[0].start_y<=y && y<=g_area_array[0].end_y)
+    if(settings_selected_idx == SET_TOUCH && g_area_array[SET_TOUCH * 3].start_x<=x && x<= g_area_array[SET_TOUCH * 3].end_x && g_area_array[SET_TOUCH * 3].start_y<=y && y<=g_area_array[SET_TOUCH * 3].end_y)
     {
       action = SELECT;
     }
-    else if(settings_selected_idx == SET_TOUCH && g_area_array[1].start_x<=x && x<= g_area_array[1].end_x && g_area_array[1].start_y<=y && y<=g_area_array[1].end_y)
+    else if(settings_selected_idx == SET_TOUCH && g_area_array[SET_TOUCH * 3 + 1].start_x<=x && x<= g_area_array[SET_TOUCH * 3 + 1].end_x && g_area_array[SET_TOUCH * 3 + 1].start_y<=y && y<=g_area_array[SET_TOUCH * 3 + 1].end_y)
     {
       action = SELECT;
     }
-    else if(settings_selected_idx == SET_TIMEOUT && g_area_array[3].start_x<=x && x<= g_area_array[3].end_x && g_area_array[3].start_y<=y && y<=g_area_array[3].end_y)
+    else if(settings_selected_idx == SET_BLUETOOTH && g_area_array[SET_BLUETOOTH * 3].start_x<=x && x<= g_area_array[SET_BLUETOOTH * 3].end_x && g_area_array[SET_BLUETOOTH * 3].start_y<=y && y<=g_area_array[SET_BLUETOOTH * 3].end_y)
+    {
+      action = PREV_OPTION;
+      rt_kprintf("select bluetooth off\n");
+    }
+    else if(settings_selected_idx == SET_BLUETOOTH && g_area_array[SET_BLUETOOTH * 3 + 1].start_x<=x && x<= g_area_array[SET_BLUETOOTH * 3 + 1].end_x && g_area_array[SET_BLUETOOTH * 3 + 1].start_y<=y && y<=g_area_array[SET_BLUETOOTH * 3 + 1].end_y)
+    {
+      action = NEXT_OPTION;
+      rt_kprintf("select bluetooth on\n");
+    }
+    else if(settings_selected_idx == SET_TIMEOUT && g_area_array[SET_TIMEOUT * 3].start_x<=x && x<= g_area_array[SET_TIMEOUT * 3].end_x && g_area_array[SET_TIMEOUT * 3].start_y<=y && y<=g_area_array[SET_TIMEOUT * 3].end_y)
     {
       action = PREV_OPTION;
       rt_kprintf("select timeout Reduce\n");
     }
-    else if(settings_selected_idx == SET_TIMEOUT && g_area_array[4].start_x<=x && x<= g_area_array[4].end_x && g_area_array[4].start_y<=y && y<=g_area_array[4].end_y)
+    else if(settings_selected_idx == SET_TIMEOUT && g_area_array[SET_TIMEOUT * 3 + 1].start_x<=x && x<= g_area_array[SET_TIMEOUT * 3 + 1].end_x && g_area_array[SET_TIMEOUT * 3 + 1].start_y<=y && y<=g_area_array[SET_TIMEOUT * 3 + 1].end_y)
     {
       action = NEXT_OPTION;
       rt_kprintf("select timeout increase\n");
     }
-    else if(settings_selected_idx == SET_FULL_REFRESH && g_area_array[6].start_x<=x && x<= g_area_array[6].end_x && g_area_array[6].start_y<=y && y<=g_area_array[6].end_y)
+    else if(settings_selected_idx == SET_FULL_REFRESH && g_area_array[SET_FULL_REFRESH * 3].start_x<=x && x<= g_area_array[SET_FULL_REFRESH * 3].end_x && g_area_array[SET_FULL_REFRESH * 3].start_y<=y && y<=g_area_array[SET_FULL_REFRESH * 3].end_y)
     {
       action = PREV_OPTION;
     }
-    else if(settings_selected_idx == SET_FULL_REFRESH && g_area_array[7].start_x<=x && x<= g_area_array[7].end_x && g_area_array[7].start_y<=y && y<=g_area_array[7].end_y)
+    else if(settings_selected_idx == SET_FULL_REFRESH && g_area_array[SET_FULL_REFRESH * 3 + 1].start_x<=x && x<= g_area_array[SET_FULL_REFRESH * 3 + 1].end_x && g_area_array[SET_FULL_REFRESH * 3 + 1].start_y<=y && y<=g_area_array[SET_FULL_REFRESH * 3 + 1].end_y)
     {
       action = NEXT_OPTION;
     }
@@ -343,6 +398,12 @@ switch (ui_state)
         rt_kprintf("Touch reading setting item %d\n", i);
         break;
       }
+    }
+    if (action == NONE &&
+        x >= g_area_array[6].start_x && x <= g_area_array[6].end_x &&
+        y >= g_area_array[6].start_y && y <= g_area_array[6].end_y)
+    {
+      action = SELECT;
     }
     break;
 
