@@ -17,7 +17,8 @@ typedef enum
   MSG_DRAW_LOW_POWER_PAGE,
   MSG_DRAW_CHARGE_PAGE,
   MSG_DRAW_WELCOME_PAGE,
-  MSG_UPDATE_CHARGE_STATUS
+  MSG_UPDATE_CHARGE_STATUS,
+  MSG_BATTERY_CHECK
 } UIAction;
 
 typedef std::function<void(UIAction)> ActionCallback_t;

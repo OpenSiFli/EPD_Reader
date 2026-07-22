@@ -10,6 +10,7 @@ extern "C" {
 
 rt_err_t ADCBattery::charge_event_callback(rt_device_t dev, rt_size_t size)
 {
+#if 0
     rt_charge_event_t event = (rt_charge_event_t)size;
     
     switch (event)
@@ -32,7 +33,7 @@ rt_err_t ADCBattery::charge_event_callback(rt_device_t dev, rt_size_t size)
         default:
             break;
     }
-    
+#endif
     return RT_EOK;
 }
 ADCBattery::ADCBattery(rt_mq_t ui_queue)
@@ -147,33 +148,13 @@ ADCBattery::~ADCBattery()
 
 void ADCBattery::battery_check_callback(void* parameter)
 {
+    // Timer callback: only send a message, let main loop do the work.
+    // Avoid ADC read / ULOG in timer thread context.
     ADCBattery* battery = static_cast<ADCBattery*>(parameter);
     if (battery && battery->ui_queue) 
     {
-        float voltage = battery->get_voltage();
-        uint8_t percentage = battery_calculator_get_percent(&battery->battery_calc, (uint32_t)(voltage * 10));
-        bool is_charging = battery->is_charging();
-        rt_kprintf("[ADCBattery] Battery Level %f, percent %d\n", voltage, (int)percentage);
-    
-        // 发送消息到UI队列
-        if (percentage < 2.0f && !is_charging && battery->low_power != 1) {
-            battery->low_power = 1;        
-            UIAction msg = MSG_DRAW_LOW_POWER_PAGE;
-            rt_mq_send(battery->ui_queue, &msg, sizeof(UIAction));
-        }
-        // 如果正在充电且之前处于低电量模式，则进入充电页面
-        else if (is_charging && battery->low_power == 1) 
-        {
-            UIAction msg = MSG_DRAW_CHARGE_PAGE;
-            rt_mq_send(battery->ui_queue, &msg, sizeof(UIAction));
-        }
-        // 如果电量充足且之前处于低电量模式，则恢复正常模式
-        else if (percentage >= 2.0f && battery->low_power == 1) 
-        {
-            battery->low_power = 0;           
-            UIAction msg = MSG_DRAW_WELCOME_PAGE;
-            rt_mq_send(battery->ui_queue, &msg, sizeof(UIAction));
-        }    
+        UIAction msg = MSG_BATTERY_CHECK;
+        rt_mq_send(battery->ui_queue, &msg, sizeof(UIAction));
     }
 }
 

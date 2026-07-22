@@ -16,6 +16,7 @@
 #include "reading_settings.h"
 #include "ulog.h"
 #include "UIRegionsManager.h"
+#include "boards/battery/ADCBattery.h"
 
 #undef LOG_TAG
 #undef DBG_LEVEL
@@ -1088,6 +1089,35 @@ void main_task(void *param)
               draw_status_bar(renderer, battery);
                 request_flush();
             }        
+        }
+
+        continue;
+      }
+      if (ui_action == MSG_BATTERY_CHECK)
+      {
+        // Periodic battery check: do the heavy work (ADC, calculator) here
+        // in main loop context instead of timer callback
+        if (battery)
+        {
+          float voltage = battery->get_voltage();
+          uint8_t percentage = battery->get_percentage();
+          bool is_charging = battery->is_charging();
+          rt_kprintf("[ADCBattery] Battery Level %f, percent %d, charging %d\n",
+                     voltage, (int)percentage, is_charging);
+
+          ADCBattery* adc_battery = static_cast<ADCBattery*>(battery);
+          if (percentage < 2 && !is_charging && adc_battery->get_low_power_state() != 1) {
+            adc_battery->set_low_power_state(1);
+            UIAction msg = MSG_DRAW_LOW_POWER_PAGE;
+            rt_mq_send(ui_queue, &msg, sizeof(UIAction));
+          } else if (is_charging && adc_battery->get_low_power_state() == 1) {
+            UIAction msg = MSG_DRAW_CHARGE_PAGE;
+            rt_mq_send(ui_queue, &msg, sizeof(UIAction));
+          } else if (percentage >= 2 && adc_battery->get_low_power_state() == 1) {
+            adc_battery->set_low_power_state(0);
+            UIAction msg = MSG_DRAW_WELCOME_PAGE;
+            rt_mq_send(ui_queue, &msg, sizeof(UIAction));
+          }
         }
         continue;
       }
