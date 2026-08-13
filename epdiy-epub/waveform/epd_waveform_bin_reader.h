@@ -15,9 +15,14 @@ typedef enum{
 
 typedef enum{
     WAVE_MODE_NONE    = 0,
-    WAVE_MODE_PARTIAL = 1,
     WAVE_MODE_FULL    = 2,
-    /* 2~15 为待确定的波形模式 */
+    WAVE_MODE_PARTIAL_4_17 = 4, 
+    WAVE_MODE_PARTIAL_5_17 = 5,  /**/
+    WAVE_MODE_FULL_6_28 = 6,  /**/
+    WAVE_MODE_FULL_7_28 = 7,  /**/
+    WAVE_MODE_PARTIAL_8_12 = 8,  /**/
+    WAVE_MODE_PARTIAL_9_12 = 9,  /**/
+    /* 2~15 为锟斤拷确锟斤拷锟侥诧拷锟斤拷模式 */
     WAVE_MODE_MAX = 16
 } WAVE_TABLE_MODE_T;
 
@@ -26,7 +31,7 @@ uint32_t waveform_bin_reader_get_frames(int temperature, WAVE_TABLE_MODE_T mode)
 void waveform_bin_reader_fill_lut(uint32_t *p_epic_lut, uint32_t frame_num);
 
 
-/* 依赖外部接口 */
+/* 锟斤拷锟斤拷锟解部锟接匡拷 */
 extern int waveform_bin_reader_read_data(uint32_t offset, uint8_t *buf, uint32_t size);
 extern void *waveform_bin_reader_malloc(size_t size);
 extern void waveform_bin_reader_free(void *ptr);
