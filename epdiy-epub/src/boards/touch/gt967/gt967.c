@@ -14,7 +14,8 @@
 #define DBG_LEVEL         DBG_INFO // DBG_ERROR  // 
 #define LOG_TAG              "drv.gt967"
 #include <drv_log.h>
-#define TP_DEV_ADDR             (0x14)
+#define TP_DEV_ADDR_DEFAULT     (0x5D)
+#define TP_DEV_ADDR_ALTERNATE   (0x14)   /* 52 固定使用 0x14；57 根据复位/INT 时序在 0x5D 与 0x14 间选择 */
 #define TP_TD_STATUS            (0x814e)
 #define TP_P1_XL                (0x8150)
 #define TP_P1_XH                (0x8151)
@@ -34,6 +35,11 @@ static rt_err_t write_reg(uint16_t reg, rt_uint8_t data);
 static rt_err_t read_regs(rt_uint16_t reg, rt_uint8_t len, rt_uint8_t *buf);
 
 static struct rt_i2c_bus_device *ft_bus = NULL;
+#ifdef SF32LB57X
+static rt_uint8_t tp_dev_addr = TP_DEV_ADDR_DEFAULT;
+#else
+static rt_uint8_t tp_dev_addr = TP_DEV_ADDR_ALTERNATE;
+#endif
 
 static struct touch_drivers driver;
 
@@ -43,7 +49,7 @@ static rt_err_t write_reg(uint16_t reg, rt_uint8_t data)
     struct rt_i2c_msg msgs;
     rt_uint8_t buf[3] = {(uint8_t)(reg >> 8), (uint8_t)reg, data};
 
-    msgs.addr  = TP_DEV_ADDR;    /* slave address */
+    msgs.addr  = tp_dev_addr;    /* slave address */
     msgs.flags = RT_I2C_WR;        /* write flag */
     msgs.buf   = buf;              /* Send data pointer */
     msgs.len   = 3;
@@ -65,12 +71,12 @@ static rt_err_t read_regs(rt_uint16_t reg, rt_uint8_t len, rt_uint8_t *buf)
     struct rt_i2c_msg msgs[2];
     rt_uint8_t reg_w[2] = {(uint8_t)(reg >> 8), (uint8_t)reg};
 
-    msgs[0].addr  = TP_DEV_ADDR;    /* Slave address */
+    msgs[0].addr  = tp_dev_addr;    /* Slave address */
     msgs[0].flags = RT_I2C_WR;        /* Write flag */
     msgs[0].buf   = reg_w;              /* Slave register address */
     msgs[0].len   = 2;                /* Number of bytes sent */
 
-    msgs[1].addr  = TP_DEV_ADDR;    /* Slave address */
+    msgs[1].addr  = tp_dev_addr;    /* Slave address */
     msgs[1].flags = RT_I2C_RD;        /* Read flag */
     msgs[1].buf   = buf;              /* Read data pointer */
     msgs[1].len   = len;              /* Number of bytes read */
@@ -147,6 +153,47 @@ static void irq_handler(void *arg)
     ret = rt_sem_release(driver.isr_sem);
     RT_ASSERT(RT_EOK == ret);
 }
+#ifdef SF32LB57X
+static rt_err_t probe_addr(rt_uint8_t dev_addr)
+{
+    struct rt_i2c_msg msgs[2];
+    rt_uint8_t reg_w[2] = {0x81, 0x44};
+    rt_uint8_t firmware[4];
+
+    msgs[0].addr  = dev_addr;
+    msgs[0].flags = RT_I2C_WR;
+    msgs[0].buf   = reg_w;
+    msgs[0].len   = sizeof(reg_w);
+
+    msgs[1].addr  = dev_addr;
+    msgs[1].flags = RT_I2C_RD;
+    msgs[1].buf   = firmware;
+    msgs[1].len   = sizeof(firmware);
+
+    return (rt_i2c_transfer(ft_bus, msgs, 2) == 2) ? RT_EOK : -RT_ERROR;
+}
+
+static rt_err_t select_device_address(void)
+{
+    if (RT_EOK == probe_addr(TP_DEV_ADDR_DEFAULT))
+    {
+        tp_dev_addr = TP_DEV_ADDR_DEFAULT;
+    }
+    else if (RT_EOK == probe_addr(TP_DEV_ADDR_ALTERNATE))
+    {
+        tp_dev_addr = TP_DEV_ADDR_ALTERNATE;
+    }
+    else
+    {
+        LOG_E("GT967 not found at 0x%02x or 0x%02x", TP_DEV_ADDR_DEFAULT, TP_DEV_ADDR_ALTERNATE);
+        return -RT_ERROR;
+    }
+
+    LOG_I("GT967 I2C address = 0x%02x", tp_dev_addr);
+    return RT_EOK;
+}
+#endif /* SF32LB57X */
+
 static rt_err_t init(void)
 {
     rt_err_t err;
@@ -154,7 +201,7 @@ static rt_err_t init(void)
 
     LOG_D("gt967 init");
 
-    rt_pin_mode(TOUCH_IRQ_PIN, PIN_MODE_OUTPUT); //上电复位I2C地址选择(通过RESET/INT时序选择0x28/0x29的I2C地址)
+    rt_pin_mode(TOUCH_IRQ_PIN, PIN_MODE_OUTPUT);
     rt_pin_write(TOUCH_IRQ_PIN, 0);
     BSP_TP_Reset(0);
     rt_thread_delay(1);
@@ -166,10 +213,23 @@ static rt_err_t init(void)
     rt_thread_delay(60);
 
     rt_touch_irq_pin_attach(PIN_IRQ_MODE_FALLING, irq_handler, NULL);
-    rt_touch_irq_pin_enable(1); //Must enable before read I2C
+    rt_touch_irq_pin_enable(1);
+
+#ifdef SF32LB57X
+    err = select_device_address();
+    if (RT_EOK != err)
+    {
+        return RT_FALSE;
+    }
+#endif
 
     uint8_t buf[6] = {0};
-    read_regs(0x8144, 4, buf);
+    err = read_regs(0x8144, 4, buf);
+    if (RT_EOK != err)
+    {
+        LOG_E("Read firmware version fail");
+        return RT_FALSE;
+    }
     uint16_t firmware_version;
     firmware_version = buf[0] + ((uint16_t)(buf[1] & 0xff) << 8);
 

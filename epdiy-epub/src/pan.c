@@ -384,8 +384,8 @@ rt_err_t pan_service_init(const char *local_name, rt_bool_t auto_request_weather
     rt_thread_startup(g_pan_service.worker);
 
     /* LCPU probe: check whether LCPU is actually running before enabling BLE */
-    // rt_kprintf("[BLE_DBG] LCPU CPUWAIT = 0x%08x (0=running, non-0=stalled)\n",
-    //            hwp_lpsys_aon->PMR & LPSYS_AON_PMR_CPUWAIT);
+    rt_kprintf("[BLE_DBG] LCPU CPUWAIT = 0x%08x (0=running, non-0=stalled)\n",
+               hwp_lpsys_aon->PMR & LPSYS_AON_PMR_CPUWAIT);
     sifli_ble_enable();
     rt_kprintf("[BLE_DBG] sifli_ble_enable() returned\n");
    

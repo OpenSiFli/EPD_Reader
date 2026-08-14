@@ -16,7 +16,9 @@
 #include "reading_settings.h"
 #include "ulog.h"
 #include "UIRegionsManager.h"
+#ifndef SF32LB57X
 #include "boards/battery/ADCBattery.h"
+#endif
 
 #undef LOG_TAG
 #undef DBG_LEVEL
@@ -1105,6 +1107,7 @@ void main_task(void *param)
           rt_kprintf("[ADCBattery] Battery Level %f, percent %d, charging %d\n",
                      voltage, (int)percentage, is_charging);
 
+#ifndef SF32LB57X
           ADCBattery* adc_battery = static_cast<ADCBattery*>(battery);
           if (percentage < 2 && !is_charging && adc_battery->get_low_power_state() != 1) {
             adc_battery->set_low_power_state(1);
@@ -1118,6 +1121,7 @@ void main_task(void *param)
             UIAction msg = MSG_DRAW_WELCOME_PAGE;
             rt_mq_send(ui_queue, &msg, sizeof(UIAction));
           }
+#endif
         }
         continue;
       }

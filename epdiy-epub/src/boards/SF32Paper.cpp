@@ -4,7 +4,9 @@
 #include <hourglass.h>
 #include "SF32_ButtonControls.h"
 #include "SF32_TouchControls.h"
+#ifndef SF32LB57X
 #include "battery/ADCBattery.h"
+#endif
 extern "C" {
 #include "dfs_fs.h"
 #include "mem_map.h"
@@ -29,11 +31,14 @@ extern Battery *battery;
 
 void SF32Paper::sleep_filesystem()
 {
+#ifdef RT_USING_SPI_MSD
     SD_card_power_off();
+#endif
 }
 
 void SF32Paper::wakeup_filesystem()
 {
+#ifdef RT_USING_SPI_MSD
     SD_card_power_on();
     int card_state=rt_pin_read(27); /*card detect pin*/
     if(card_state == 0)
@@ -45,7 +50,7 @@ void SF32Paper::wakeup_filesystem()
     {
         rt_kprintf("SD card removed\n");
     }
-
+#endif
 }
 void SF32Paper::power_up()
 {
@@ -80,7 +85,9 @@ void SF32Paper::power_up()
                 {
                     // 按键已松开，认为是误触发，直接关机
                     rt_kprintf("Not long press, shutdown now.\n");
+#ifndef SF32LB57X
                     PowerDownCustom();
+#endif
                     while (1) {};
                 }
                 else
@@ -108,14 +115,20 @@ void SF32Paper::power_up()
 }
 void SF32Paper::prepare_to_sleep()
 {
+#ifdef RT_USING_SPI_MSD
     SD_card_power_off();
+#endif
     if (battery) 
     {
+#ifndef SF32LB57X
         ADCBattery* adc_battery = static_cast<ADCBattery*>(battery);
         adc_battery->stop_battery_monitor();
+#endif
     }
    
+#ifndef SF32LB57X
     PowerDownCustom();
+#endif
 }
 Renderer *SF32Paper::get_renderer()
 {
@@ -159,7 +172,11 @@ void SF32Paper::start_filesystem()
     if (MMCSD_HOST_PLUGED == sd_state)
     {
         LOG_I("SD-Card plug in\n");
+#ifdef BSP_USING_SDMMC2
+        name[0] = (char *)"sd1";
+#else
         name[0] = (char *)"sd0";
+#endif
     }
     else
     {

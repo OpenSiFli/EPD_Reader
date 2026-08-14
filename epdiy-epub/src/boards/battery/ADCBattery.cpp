@@ -1,3 +1,4 @@
+#ifndef SF32LB57X
 #include "battery/ADCBattery.h"
 #include "Battery.h"
 #include "boards/controls/TouchControls.h"
@@ -169,3 +170,4 @@ void ADCBattery::set_low_power_state(uint8_t state)
 {
     low_power = state;
 }
+#endif /* !SF32LB57X */

@@ -3,7 +3,11 @@
 #include <rtthread.h>
 #include "mem_section.h"
 
+#ifdef SF32LB57X
+#define EPUB_MEMHEAP_POOL_SIZE (4*1024*1024)
+#else
 #define EPUB_MEMHEAP_POOL_SIZE (6*1024*1024)
+#endif
 
 struct rt_memheap epub_psram_memheap;
 
@@ -84,7 +88,7 @@ rt_uint32_t heap_free_size(void)
 
 
 /*==========================================================================
- * FreeType ÄÚ´æ·ÖÅäÊÊÅä
+ * FreeType ï¿½Ú´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
  *========================================================================*/
 #ifdef PKG_FREETYPE
 #include <string.h>
