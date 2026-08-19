@@ -1,0 +1,113 @@
+[
+    {"version": "2"},
+    {
+        "mem": "flash2", 
+        "base": "0x12000000", 
+        "regions": [
+            {
+                "offset": "0x00020000",
+                "max_size": "0x00060000",
+                "tags": [
+                    "DFU_FLASH_CODE"
+                ],
+                "name": "dfu",
+                "type": ["app_img", "app_exec"]
+            },
+            {
+                "offset": "0x00080000",
+                "max_size": "0x00120000",
+                "tags": [
+                    "DFU_DOWNLOAD_REGION"
+                ]
+            },
+            {
+                "offset": "0x001A0000", 
+                "max_size": "0x00004000", 
+                "tags": [
+                    "KVDB_DFU_REGION"
+                ]
+            }, 
+            {
+                "offset": "0x001A4000", 
+                "max_size": "0x00004000", 
+                "tags": [
+                    "KVDB_BLE_REGION"
+                ]
+            },
+            {
+                "offset": "0x00200000", 
+                "max_size": "0x00200000", 
+                "tags": [
+                    "HCPU_FLASH_CODE"
+                ], 
+                "name": "main:1",
+                "type": ["app_img", "app_exec"]
+            }, 
+            {
+                "offset": "0x00400000", 
+                "max_size": "0x00A00000", 
+                "tags": [
+                    "BUILTIN_RESOURCE"
+                ],
+                "name": "main:2",
+                "type": ["app_img"]
+            },
+            {
+                "offset": "0x00E00000", 
+                "max_size": "0x00020000",
+                "name": "acpu",
+                "core": "acpu",
+                "type": ["app_img", "app_exec"]
+            },
+            {
+                "offset": "0x00E20000",
+                "max_size": "0x000C0000",
+                "name": "fs_root", 
+                "tags": [
+                    "FS_REGION"
+                ]
+            },
+            {
+                "offset": "0x00EE0000",
+                "max_size": "0x00020000",
+                "name": "wave_table", 
+                "tags": [
+                    "CUSTOM_EPD_WAVE_TABLE"
+                ]
+            }
+        ]
+    }, 
+    {
+        "mem": "psram1", 
+        "base": "0x60000000", 
+        "regions": [
+            {
+                "offset": "0x00000000", 
+                "max_size": "0x01000000", 
+                "tags": [
+                    "PSRAM_DATA"
+                ]
+            }
+        ]
+    }, 
+    {
+        "mem": "hpsys_ram", 
+        "base": "0x20000000", 
+        "regions": [
+            {
+                "offset": "0x00000000", 
+                "max_size": "0x0006FC00", 
+                "tags": [
+                    "HCPU_RAM_DATA"
+                ]
+            }, 
+            {
+                "offset": "0x0006FC00", 
+                "max_size": "0x0000FC00", 
+                "tags": [
+                    "ACPU_RAM_DATA"
+                ]
+            }
+        ]
+    }
+]

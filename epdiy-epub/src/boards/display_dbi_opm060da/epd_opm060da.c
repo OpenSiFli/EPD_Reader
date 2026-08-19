@@ -182,9 +182,15 @@ static void LCD_WritePixel(LCDC_HandleTypeDef *hlcdc, uint16_t Xpos, uint16_t Yp
 Define a mixed grey framebuffer on PSRAM
 high 4 bits for old pixel and low 4 bits for new pixel in every byte.
 */
+#ifdef BSP_USING_PSRAM2
 L2_NON_RET_BSS_SECT2_BEGIN(frambuf)
 L2_NON_RET_BSS_SECT2(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[EPD_PANEL_HOR * EPD_PANEL_VER]);
 L2_NON_RET_BSS_SECT2_END
+#else
+L2_NON_RET_BSS_SECT_BEGIN(frambuf)
+L2_NON_RET_BSS_SECT(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[EPD_PANEL_HOR * EPD_PANEL_VER]);
+L2_NON_RET_BSS_SECT_END
+#endif
 
 /*
  * 57 屏驱通过波形表自动计算刷新帧数，无需外部设置部分刷新次数。

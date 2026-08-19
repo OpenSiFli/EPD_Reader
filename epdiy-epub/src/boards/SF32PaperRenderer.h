@@ -9,7 +9,7 @@ extern "C" {
 #ifdef SF32LB52x
 #include "epd_pin_defs.h"
 #endif
-#ifdef SF32LB57X
+#if defined(SF32LB57X) && defined(BSP_USING_PSRAM2)
 L2_NON_RET_BSS_SECT2_BEGIN(frambuf)
 #ifdef EPDIY_EPUB_1BPP
 L2_NON_RET_BSS_SECT2(frambuf, ALIGN(64) static uint8_t framebuffer1[(EPD_WIDTH * EPD_HEIGHT + 7) / 8]);//1bpp
