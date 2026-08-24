@@ -14,9 +14,19 @@
 #include "mem_section.h"
 #include "epd_waveform.h"
 
+/**
+  * @brief epd_opm060da chip IDs
+  */
+#define THE_LCD_ID                  0x19355
+
+#define  DBG_LEVEL            DBG_INFO  //DBG_LOG //
+#define LOG_TAG                "epd_opm060da"
+#include "log.h"
+
+
 /* Panel native (TCON output) resolution */
-#define EPD_PANEL_HOR 1024
-#define EPD_PANEL_VER 758
+#define EPD_PANEL_HOR 1216
+#define EPD_PANEL_VER 684
 
 /* Rotation mode (from V12 epd_display.c logic) */
 enum EpdRotation
@@ -37,46 +47,33 @@ enum EpdRotation
     #define DISPLAY_ROTATE EPD_ROT_LANDSCAPE
 #endif
 
-static enum EpdRotation display_rotation = EPD_ROT_LANDSCAPE;
-
-/**
-  * @brief epd_opm060da chip IDs
-  */
-#define THE_LCD_ID                  0x19386
-
-#define  DBG_LEVEL            DBG_INFO  //DBG_LOG //
-#define LOG_TAG                "epd_opm060da"
-#include "log.h"
-
-
-static const LCDC_InitTypeDef lcdc_int_cfg_edp_8bit =
+static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
 {
-    .lcd_itf = LCDC_INTF_EPD_8BIT,
-    .freq = 40 * 1000 * 1000, //sclk frequnecy
+    .lcd_itf = LCDC_INTF_EPD_16BIT,
+    .freq = 24 * 1000 * 1000, //sclk frequnecy
     .color_mode = LCDC_PIXEL_FORMAT_F2_SWAP,
 
     .cfg = {
         .epd = {
-#ifdef EPD_WAVEFORM_USE_BIN
-            .SDMODE = 1, //Source driver mode (BIN waveform requires SDMODE=1)
-#else
             .SDMODE = 0, //Source driver mode
-#endif
             .SDCLK_polarity = 0, //Source driver clock polarity
             .GDSP_polarity = 0,
             .GDCLK_polarity = 0, //Gate clock polarity
 
-            .LSL = 1, //Line start length
-            .LBL = 4, //Line begin length
-            .LDL = EPD_PANEL_HOR >> 2, //Line data length (1024 / 4)
-            .LEL = 9, //Line end length
+            .LSL = 4, //Line start length
+            .LBL = 10, //Line begin length
+            .LDL = (1216 ) >> 3, //Line data length (1216/8=152 for 16bit mode)
+            .LEL = 8, //Line end length
 
             .GSTA = 7, //Gate STA length
 
             .FSL = 1, //Frame sync length
-            .FBL = 3, //Frame begin length
-            .FDL = EPD_PANEL_VER, //Frame data length (758 rows)
-            .FEL = 5, //Frame end length
+            .FBL = 10, //Frame begin length
+            .FDL = 684, //Frame data length (684 rows)
+            .FEL = 10, //Frame end length
+
+
+
         },
     },
 
@@ -104,7 +101,7 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
 {
     uint8_t parameter[32];
 
-    memcpy(&lcdc_int_cfg, &lcdc_int_cfg_edp_8bit, sizeof(lcdc_int_cfg));
+    memcpy(&lcdc_int_cfg, &lcdc_int_cfg_edp_16bit, sizeof(lcdc_int_cfg));
     memcpy(&hlcdc->Init, &lcdc_int_cfg, sizeof(LCDC_InitTypeDef));
     HAL_LCDC_Init(hlcdc);
 
@@ -115,18 +112,9 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
     BSP_LCD_Reset(1);
     rt_thread_mdelay(10);
 
-
-    HAL_LCDC_SetROIArea(hlcdc, 0, 0, EPD_PANEL_HOR - 1, EPD_PANEL_VER - 1);
-
-    display_rotation = DISPLAY_ROTATE;
-
+    HAL_LCDC_SetROIArea(hlcdc, 0, 0, LCD_HOR_RES_MAX - 1, LCD_VER_RES_MAX - 1);
     epd_wave_table();
-
-#ifdef EPD_WAVEFORM_USE_BIN
-    tps_init(2100); //-2.10V (BIN waveform requires VCOM=2100mV)
-#else
-    tps_init(1000); //-1.00V
-#endif
+    tps_init(1000); //-1.5V (match SDK)
     tps_exit_sleep();
 }
 
@@ -182,20 +170,17 @@ static void LCD_WritePixel(LCDC_HandleTypeDef *hlcdc, uint16_t Xpos, uint16_t Yp
 Define a mixed grey framebuffer on PSRAM
 high 4 bits for old pixel and low 4 bits for new pixel in every byte.
 */
-#ifdef BSP_USING_PSRAM2
-L2_NON_RET_BSS_SECT2_BEGIN(frambuf)
-L2_NON_RET_BSS_SECT2(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[EPD_PANEL_HOR * EPD_PANEL_VER]);
-L2_NON_RET_BSS_SECT2_END
-#else
 L2_NON_RET_BSS_SECT_BEGIN(frambuf)
-L2_NON_RET_BSS_SECT(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[EPD_PANEL_HOR * EPD_PANEL_VER]);
+L2_NON_RET_BSS_SECT(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[LCD_HOR_RES_MAX * LCD_VER_RES_MAX]);
 L2_NON_RET_BSS_SECT_END
-#endif
+
 
 L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
 {
-    RT_ASSERT(LCD_HOR_RES_MAX == (Xpos1 - Xpos0 + 1));
-    RT_ASSERT(LCD_VER_RES_MAX == (Ypos1 - Ypos0 + 1));
+    uint32_t total_pixels = LCD_HOR_RES_MAX * LCD_VER_RES_MAX;
+    RT_ASSERT(LCD_HOR_RES_MAX == (Xpos1 - Xpos0 + 1)); //Support only full screen
+    RT_ASSERT(LCD_VER_RES_MAX == (Ypos1 - Ypos0 + 1)); //Support only full screen
+    RT_ASSERT((total_pixels % 4) == 0); // 必须是4像素的倍数
 
     //Convert layer data to 4bit gray data
     if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_MONO)
@@ -204,56 +189,32 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
     }
     else if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_A4)
     {
+        uint32_t n = total_pixels / 4; // 每次处理4像素（4字节）
+        uint32_t *p_dst = (uint32_t *)mixed_framebuffer;
         const uint8_t *p_src = RGBCode;
-        uint8_t *p_dst = mixed_framebuffer;
 
-        if (display_rotation == EPD_ROT_INVERTED_PORTRAIT)
+        while (n--)
         {
-            // 把竖屏帧缓冲 758x1024 旋转成面板横屏 1024x758
-            // 源像素 (x, y) → 面板像素 (y, 757-x)
-            uint16_t src_w = LCD_HOR_RES_MAX; // 758
+            uint8_t byte0 = *p_src++;
+            uint8_t byte1 = *p_src++;
 
-            for (uint16_t x = Xpos0; x <= Xpos1; x++)
-            {
-                uint16_t sx = x - Xpos0;
-                uint8_t *p_dst_row = &p_dst[(LCD_HOR_RES_MAX - 1 - x) * EPD_PANEL_HOR];
+            // 生成4像素的新值
+            uint32_t src_v = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
 
-                for (uint16_t y = Ypos0; y <= Ypos1; y++)
-                {
-                    uint16_t sy = y - Ypos0;
-                    uint8_t src_byte = p_src[sy * (src_w / 2) + sx / 2];
-                    uint8_t gray = (sx & 1) ? (src_byte >> 4) : (src_byte & 0x0F);
+            // 读取原像素，旧像素清零，新像素移入老像素
+            uint32_t dst_v = (*p_dst & 0x0F0F0F0F) << 4;
 
-                    uint8_t *p_dst_pixel = &p_dst_row[y];
-                    *p_dst_pixel = ((*p_dst_pixel & 0x0F) << 4) | gray;
-                }
-            }
-        }
-        else
-        {
-            uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 4; // 每次处理4像素（4字节）
-            uint32_t *p_dst32 = (uint32_t *)(mixed_framebuffer);
-
-            while (n--)
-            {
-                uint8_t byte0 = *p_src++;
-                uint8_t byte1 = *p_src++;
-
-                // 生成4像素的新值
-                uint32_t src_v = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
-
-                // 读取原像素，旧像素清零，新像素移入老像素
-                uint32_t dst_v = (*p_dst32 & 0x0F0F0F0F) << 4;
-
-                // 合并新像素
-                *p_dst32++ = dst_v | src_v;
-            }
+            // 合并新像素
+            *p_dst++ = dst_v | src_v;
         }
     }
     else if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_RGB565)
     {
-        // 计算灰度值
-        // 0.299*R + 0.587*G + 0.114*B
+        uint32_t n = total_pixels / 4; // 每次处理4像素
+        uint32_t *p_dst = (uint32_t *)mixed_framebuffer;
+        const uint16_t *p_src = (const uint16_t *)RGBCode;
+
+        // 计算灰度值: 0.299*R + 0.587*G + 0.114*B
 #define RGB565_TO_GRAY4(rgb)  ( \
         (uint8_t)(( \
         ((((rgb) >> 8) & 0xF8) * 77 + \
@@ -261,71 +222,80 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
          (((rgb) << 3) & 0xF8) * 29) >> 8) >> 4) \
         )
 
-        if (display_rotation == EPD_ROT_INVERTED_PORTRAIT)
+        while (n--)
         {
-            // Rotate LVGL portrait 758x1024 → panel landscape 1024x758
-            // Source pixel (x, y) → dest pixel (y, 757-x)
-            RT_ASSERT(((Ypos1 - Ypos0 + 1) % 4) == 0);
-            RT_ASSERT((Ypos0 % 4) == 0);
+            uint8_t pixel0 = RGB565_TO_GRAY4(*p_src);
+            p_src++;
+            uint8_t pixel1 = RGB565_TO_GRAY4(*p_src);
+            p_src++;
+            uint8_t pixel2 = RGB565_TO_GRAY4(*p_src);
+            p_src++;
+            uint8_t pixel3 = RGB565_TO_GRAY4(*p_src);
+            p_src++;
 
-            const uint16_t *p_src = (const uint16_t *)RGBCode;
-            uint8_t *p_dst = mixed_framebuffer;
+            // 生成4像素的新值
+            uint32_t src_v = ((pixel3 << 24) | (pixel2 << 16) | (pixel1 << 8) | pixel0) & 0x0F0F0F0F;
 
-            for (uint16_t x = Xpos0; x < Xpos1; x++)
-            {
-                for (uint16_t y = Ypos0; y < Ypos1; y += 4)
-                {
-                    uint8_t gray0 = RGB565_TO_GRAY4(p_src[(y - Ypos0) * (Xpos1 - Xpos0 + 1) + (x - Xpos0)]);
-                    uint8_t gray1 = RGB565_TO_GRAY4(p_src[(y + 1 - Ypos0) * (Xpos1 - Xpos0 + 1) + (x - Xpos0)]);
-                    uint8_t gray2 = RGB565_TO_GRAY4(p_src[(y + 2 - Ypos0) * (Xpos1 - Xpos0 + 1) + (x - Xpos0)]);
-                    uint8_t gray3 = RGB565_TO_GRAY4(p_src[(y + 3 - Ypos0) * (Xpos1 - Xpos0 + 1) + (x - Xpos0)]);
+            // 读取原像素，旧像素清零，新像素移入老像素
+            uint32_t dst_v = (*p_dst & 0x0F0F0F0F) << 4;
 
-                    uint16_t dst_x0 = y;
-                    uint16_t dst_y0 = LCD_HOR_RES_MAX - 1 - x;
-
-                    uint32_t dst_index = dst_y0 * EPD_PANEL_HOR + dst_x0;
-                    uint32_t old_val = *((uint32_t *)(p_dst + dst_index));
-
-                    uint32_t new_val =
-                        (((old_val >> 0) & 0x0F) << 4)  | gray0 |
-                        (((old_val >> 8) & 0x0F) << 12) | (gray1 << 8) |
-                        (((old_val >> 16) & 0x0F) << 20) | (gray2 << 16) |
-                        (((old_val >> 24) & 0x0F) << 28) | (gray3 << 24);
-
-                    *((uint32_t *)(p_dst + dst_index)) = new_val;
-                }
-            }
+            // 合并新像素
+            *p_dst++ = dst_v | src_v;
         }
-        else
+    }
+    else if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_RGB888)
+    {
+        uint32_t n = total_pixels / 4; // 每次处理4像素
+        uint32_t *p_dst = (uint32_t *)mixed_framebuffer;
+        const uint8_t *p_src = RGBCode;
+
+        // 每像素3字节(BGR顺序): B, G, R
+        while (n--)
         {
-            uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 4; // 每次处理4像素（4字节）
-            uint32_t *p_dst = (uint32_t *)(mixed_framebuffer);
-            const uint16_t *p_src = (const uint16_t *)RGBCode;
+            uint8_t b0 = *p_src++; uint8_t g0 = *p_src++; uint8_t r0 = *p_src++;
+            uint8_t b1 = *p_src++; uint8_t g1 = *p_src++; uint8_t r1 = *p_src++;
+            uint8_t b2 = *p_src++; uint8_t g2 = *p_src++; uint8_t r2 = *p_src++;
+            uint8_t b3 = *p_src++; uint8_t g3 = *p_src++; uint8_t r3 = *p_src++;
 
-            while (n--)
-            {
-                uint8_t pixel0 = RGB565_TO_GRAY4(*p_src);
-                p_src++;
-                uint8_t pixel1 = RGB565_TO_GRAY4(*p_src);
-                p_src++;
-                uint8_t pixel2 = RGB565_TO_GRAY4(*p_src);
-                p_src++;
-                uint8_t pixel3 = RGB565_TO_GRAY4(*p_src);
-                p_src++;
+            uint8_t pixel0 = (uint8_t)((r0 * 77 + g0 * 150 + b0 * 29) >> 12);
+            uint8_t pixel1 = (uint8_t)((r1 * 77 + g1 * 150 + b1 * 29) >> 12);
+            uint8_t pixel2 = (uint8_t)((r2 * 77 + g2 * 150 + b2 * 29) >> 12);
+            uint8_t pixel3 = (uint8_t)((r3 * 77 + g3 * 150 + b3 * 29) >> 12);
 
+            // 生成4像素的新值
+            uint32_t src_v = ((pixel3 << 24) | (pixel2 << 16) | (pixel1 << 8) | pixel0) & 0x0F0F0F0F;
 
-                // 生成4像素的新值
-                uint32_t src_v = ((pixel3 << 24) | (pixel2 << 16) | (pixel1 << 8) | pixel0) & 0x0F0F0F0F;
+            // 读取原像素，旧像素清零，新像素移入老像素
+            uint32_t dst_v = (*p_dst & 0x0F0F0F0F) << 4;
 
-                // 读取原像素，旧像素清零，新像素移入老像素
-                uint32_t dst_v = (*p_dst & 0x0F0F0F0F) << 4;
-
-                // 合并新像素
-                *p_dst++ = dst_v | src_v;
-            }
+            // 合并新像素
+            *p_dst++ = dst_v | src_v;
         }
+    }
+    else if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_ARGB888)
+    {
+        uint32_t n = total_pixels / 4; // 每次处理4像素
+        uint32_t *p_dst = (uint32_t *)mixed_framebuffer;
+        const uint32_t *p_src = (const uint32_t *)RGBCode;
 
-#undef RGB565_TO_GRAY4
+        while (n--)
+        {
+            // ARGB8888: 0xAARRGGBB (内存顺序: B,G,R,A)
+            uint32_t c0 = *p_src++;
+            uint32_t c1 = *p_src++;
+            uint32_t c2 = *p_src++;
+            uint32_t c3 = *p_src++;
+
+            uint8_t pixel0 = (uint8_t)((((c0 >> 16) & 0xFF) * 77 + ((c0 >> 8) & 0xFF) * 150 + (c0 & 0xFF) * 29) >> 12);
+            uint8_t pixel1 = (uint8_t)((((c1 >> 16) & 0xFF) * 77 + ((c1 >> 8) & 0xFF) * 150 + (c1 & 0xFF) * 29) >> 12);
+            uint8_t pixel2 = (uint8_t)((((c2 >> 16) & 0xFF) * 77 + ((c2 >> 8) & 0xFF) * 150 + (c2 & 0xFF) * 29) >> 12);
+            uint8_t pixel3 = (uint8_t)((((c3 >> 16) & 0xFF) * 77 + ((c3 >> 8) & 0xFF) * 150 + (c3 & 0xFF) * 29) >> 12);
+
+            uint32_t src_v = ((pixel3 << 24) | (pixel2 << 16) | (pixel1 << 8) | pixel0) & 0x0F0F0F0F;
+            uint32_t dst_v = (*p_dst & 0x0F0F0F0F) << 4;
+
+            *p_dst++ = dst_v | src_v;
+        }
     }
     else
         RT_ASSERT(0);
@@ -379,7 +349,8 @@ static void LCD_WriteMultiplePixels(LCDC_HandleTypeDef *hlcdc, const uint8_t *RG
     LOG_I("LCD_WriteMultiplePixels %d pixels to %d, %d", (Xpos1 - Xpos0) * (Ypos1 - Ypos0), Xpos0, Ypos0);
 
     CopyToMixedGrayBuffer(hlcdc, RGBCode, Xpos0, Ypos0, Xpos1, Ypos1);
-    HAL_LCDC_LayerSetData(hlcdc, HAL_LCDC_LAYER_DEFAULT, (uint8_t *)mixed_framebuffer, 0, 0, EPD_PANEL_HOR - 1, EPD_PANEL_VER - 1);
+    mpu_dcache_clean(&mixed_framebuffer[0], sizeof(mixed_framebuffer));
+    HAL_LCDC_LayerSetData(hlcdc, HAL_LCDC_LAYER_DEFAULT, (uint8_t *)mixed_framebuffer, Xpos0, Ypos0, Xpos1, Ypos1);
     HAL_LCDC_LayerSetFormat(hlcdc, HAL_LCDC_LAYER_DEFAULT, LCDC_PIXEL_FORMAT_L8);
 
     HAL_LCDC_LayerSetLTab(hlcdc, HAL_LCDC_LAYER_DEFAULT, (LCDC_AColorDef *)lut);
@@ -470,5 +441,6 @@ static const LCD_DrvOpsDef lcd_drv_operations =
     NULL
 };
 
-LCD_DRIVER_EXPORT2(epd_opm060da, THE_LCD_ID, &lcdc_int_cfg,
+LCD_DRIVER_EXPORT2(epd_e0470a01, THE_LCD_ID, &lcdc_int_cfg,
                    &lcd_drv_operations, 1);
+

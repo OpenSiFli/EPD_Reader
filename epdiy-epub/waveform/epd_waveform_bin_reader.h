@@ -12,6 +12,7 @@ typedef enum{
 
 typedef enum{
     WAVE_MODE_NONE    = 0,
+    WAVE_MODE_PARTIAL = 4,
     WAVE_MODE_FULL    = 2,
     WAVE_MODE_PARTIAL_4_17 = 4, 
     WAVE_MODE_PARTIAL_5_17 = 5,  /**/
