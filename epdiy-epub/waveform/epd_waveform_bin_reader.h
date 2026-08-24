@@ -12,14 +12,8 @@ typedef enum{
 
 typedef enum{
     WAVE_MODE_NONE    = 0,
-    WAVE_MODE_PARTIAL = 4,
-    WAVE_MODE_FULL    = 2,
-    WAVE_MODE_PARTIAL_4_17 = 4, 
-    WAVE_MODE_PARTIAL_5_17 = 5,  /**/
-    WAVE_MODE_FULL_6_28 = 6,  /**/
-    WAVE_MODE_FULL_7_28 = 7,  /**/
-    WAVE_MODE_PARTIAL_8_12 = 8,  /**/
-    WAVE_MODE_PARTIAL_9_12 = 9,  /**/
+    WAVE_MODE_PARTIAL = 4,   //4,5,8,9  其他波形模式有
+    WAVE_MODE_FULL    = 2,   //6,7
     /* 2~15 Ϊ��ȷ���Ĳ���ģʽ */
     WAVE_MODE_MAX = 16
 } WAVE_TABLE_MODE_T;
