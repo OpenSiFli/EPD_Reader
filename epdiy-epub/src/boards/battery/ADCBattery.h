@@ -1,3 +1,4 @@
+#ifndef SF32LB57X
 #include "Battery.h"
 #include <math.h>
 extern "C" {
@@ -38,3 +39,4 @@ public:
 
     
 };
+#endif /* !SF32LB57X */

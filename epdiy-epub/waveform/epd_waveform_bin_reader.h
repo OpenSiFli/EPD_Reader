@@ -1,6 +1,3 @@
-
-#include "epd_configs.h"
-
 typedef enum{
     EPD_WAVEFORM_ERR_OK = 0,
     EPD_WAVEFORM_ERR_INVALID_MAGIC_NUMBER = -1,

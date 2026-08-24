@@ -6,7 +6,19 @@
 extern "C" {
 #include "mem_section.h"
 
+#ifdef SF32LB52x
 #include "epd_pin_defs.h"
+#endif
+#if defined(SF32LB57X) && defined(BSP_USING_PSRAM2)
+L2_NON_RET_BSS_SECT2_BEGIN(frambuf)
+#ifdef EPDIY_EPUB_1BPP
+L2_NON_RET_BSS_SECT2(frambuf, ALIGN(64) static uint8_t framebuffer1[(EPD_WIDTH * EPD_HEIGHT + 7) / 8]);//1bpp
+#else
+L2_NON_RET_BSS_SECT2(frambuf, ALIGN(64) static uint8_t framebuffer1[EPD_WIDTH * EPD_HEIGHT / 2]);
+#endif
+
+L2_NON_RET_BSS_SECT2_END
+#else
 L2_NON_RET_BSS_SECT_BEGIN(frambuf)
 #ifdef EPDIY_EPUB_1BPP
 L2_NON_RET_BSS_SECT(frambuf, ALIGN(64) static uint8_t framebuffer1[(EPD_WIDTH * EPD_HEIGHT + 7) / 8]);//1bpp
@@ -15,6 +27,7 @@ L2_NON_RET_BSS_SECT(frambuf, ALIGN(64) static uint8_t framebuffer1[EPD_WIDTH * E
 #endif
 
 L2_NON_RET_BSS_SECT_END
+#endif
 
 }
 class SF32PaperRenderer : public EpdiyFrameBufferRenderer {
