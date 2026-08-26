@@ -23,6 +23,7 @@ typedef enum {
   WELCOME_PAGE,        // 欢迎页面
   LOW_POWER_PAGE,      // 低电量页面
   CHARGING_PAGE,       // 充电页面
-  SHUTDOWN_PAGE        // 关机页面
+  SHUTDOWN_PAGE,       // 关机页面
+  BLANK_PAGE           // 空白页面（测试用，绘制45°斜线）
 } AppUIState;
 #endif

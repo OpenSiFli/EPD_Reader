@@ -166,6 +166,9 @@ static void render_main_page(Renderer *renderer)
     case OPTION_CONTINUE_READING:
       opt_text = has_continue_reading ? "继续阅读" : "无阅读记录";
       break;
+    case OPTION_BLANK_PAGE:
+      opt_text = "空白页面";
+      break;
     default:
       opt_text = "打开书库";
       break;
@@ -937,3 +940,179 @@ int handleWeatherCityPage(Renderer *renderer, UIAction action, bool needs_redraw
 
   return 0;
 }
+
+// ============================================================
+// 空白页面（测试用）：绘制45°斜线
+// ============================================================
+static int blank_line_width = 1;     // 斜线宽度（像素）
+static int blank_line_offset = 8;    // 第二条线偏移量（像素）
+static int blank_vline_spacing = 0;  // 垂直线间距：0=不画，>0=每隔N像素画一条垂直线
+
+static void render_blank_page(Renderer *renderer)
+{
+  clear_areas();
+
+  int w = renderer->get_page_width();
+  int h = renderer->get_page_height();
+
+  // 白色背景
+  renderer->fill_rect(0, 0, w, h, 255);
+
+  // 绘制两条45°平行斜线
+  {
+    int len = (w < h) ? w : h;
+    int offsets[] = {0, blank_line_offset};
+    for (int line = 0; line < 2; line++)
+    {
+      int y_off = offsets[line];
+      for (int i = 0; i <= len; i++)
+      {
+        for (int t = 0; t < blank_line_width; t++)
+        {
+          int px = i;
+          int py = i + y_off + t;
+          if (px >= 0 && px < w && py >= 0 && py < h)
+            renderer->draw_pixel(px, py, 0);
+        }
+      }
+    }
+  }
+
+  // 绘制垂直线（与斜线共存）
+  if (blank_vline_spacing > 0)
+  {
+    for (int x = 0; x < w; x += blank_vline_spacing)
+    {
+      for (int y = 0; y < h; y++)
+        renderer->draw_pixel(x, y, 0);
+    }
+  }
+
+  // 标题
+  const char *title = "空白页面";
+  int title_w = renderer->get_text_width(title);
+  int title_h = renderer->get_line_height();
+  renderer->draw_text((w - title_w) / 2, 44, title, true, true);
+
+  // 显示当前参数
+  char info[64];
+  if (blank_vline_spacing > 0)
+    rt_snprintf(info, sizeof(info), "线宽：%d 偏移：%d 垂直：%d", blank_line_width, blank_line_offset, blank_vline_spacing);
+  else
+    rt_snprintf(info, sizeof(info), "线宽：%d 偏移：%d", blank_line_width, blank_line_offset);
+  int info_w = renderer->get_text_width(info);
+  renderer->draw_text((w - info_w) / 2, 44 + title_h + 12, info, false, true);
+
+  // 底部按钮：返回
+  int btn_h = 62;
+  int btn_w = 200;
+  int btn_x = (w - btn_w) / 2;
+  int btn_y = h - btn_h - 40;
+  renderer->draw_rect(btn_x, btn_y, btn_w, btn_h, 0);
+  const char *btn_label = "返回";
+  int bw = renderer->get_text_width(btn_label);
+  int bh = renderer->get_line_height();
+  add_area(btn_x, btn_y, btn_w, btn_h);
+  renderer->draw_text(btn_x + (btn_w - bw) / 2, btn_y + (btn_h - bh) / 2, btn_label, false, true);
+}
+
+int handleBlankPage(Renderer *renderer, UIAction action, bool needs_redraw)
+{
+  if (needs_redraw || action == NONE)
+  {
+    render_blank_page(renderer);
+    return 0;
+  }
+
+  switch (action)
+  {
+    case UP:
+      // 增大线宽
+      if (blank_line_width < 20)
+        blank_line_width++;
+      render_blank_page(renderer);
+      break;
+    case DOWN:
+      // 减小线宽
+      if (blank_line_width > 1)
+        blank_line_width--;
+      render_blank_page(renderer);
+      //RT_ASSERT(0);
+      break;
+    case SELECT:
+      return 1; // 返回主页面
+    default:
+      break;
+  }
+  return 0;
+}
+
+// 串口命令：控制空白页面斜线偏移
+// 用法：blank_offset [值]  — 不带参数显示当前值，带参数设置新值
+static void blank_offset(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("当前偏移量：%d px\n", blank_line_offset);
+        rt_kprintf("用法：blank_offset <像素值>  (0~200)\n");
+        return;
+    }
+
+    int val = atoi(argv[1]);
+    if (val < 0) val = 0;
+    if (val > 200) val = 200;
+    blank_line_offset = val;
+    rt_kprintf("偏移量已设为：%d px\n", blank_line_offset);
+}
+
+FINSH_FUNCTION_EXPORT_ALIAS(blank_offset, __cmd_blank_offset, Set blank page line offset);
+
+// 串口命令：控制空白页面线宽
+// 用法：blank_width [值]  — 不带参数显示当前值，带参数设置新值
+static void blank_width(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("当前线宽：%d px\n", blank_line_width);
+        rt_kprintf("用法：blank_width <像素值>  (1~20)\n");
+        return;
+    }
+
+    int val = atoi(argv[1]);
+    if (val < 1) val = 1;
+    if (val > 20) val = 20;
+    blank_line_width = val;
+    rt_kprintf("线宽已设为：%d px\n", blank_line_width);
+}
+
+FINSH_FUNCTION_EXPORT_ALIAS(blank_width, __cmd_blank_width, Set blank page line width);
+
+// 串口命令：控制空白页面垂直线间距
+// 用法：blank_vlines [间距]  — 不带参数显示当前值，带参数设置间距（0=不画垂直线）
+extern Renderer *renderer;
+static void blank_vline_cmd(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        rt_kprintf("当前垂直线间距：%d px (%s)\n", blank_vline_spacing,
+                   blank_vline_spacing > 0 ? "开启" : "关闭");
+        rt_kprintf("用法：blank_vlines <间距>  (0=不画, 1~200=间距像素数)\n");
+        return;
+    }
+
+    int val = atoi(argv[1]);
+    if (val < 0) val = 0;
+    if (val > 200) val = 200;
+    blank_vline_spacing = val;
+    rt_kprintf("垂直线间距已设为：%d px\n", blank_vline_spacing);
+
+    // 如果当前在空白页面，立即刷新显示
+    extern AppUIState ui_state;
+    if (ui_state == BLANK_PAGE && renderer)
+    {
+        render_blank_page(renderer);
+        renderer->flush_display();
+    }
+}
+
+FINSH_FUNCTION_EXPORT_ALIAS(blank_vline_cmd, __cmd_blank_vlines, Set blank page vertical lines spacing);

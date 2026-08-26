@@ -12,6 +12,7 @@ typedef enum
 	OPTION_ENTER_SETTINGS,
 	OPTION_WEATHER,
 	OPTION_CONTINUE_READING,
+	OPTION_BLANK_PAGE,
 	OPTION_COUNT
 } MainOption;
 
@@ -38,6 +39,10 @@ int handleWeatherPage(Renderer *renderer, UIAction action, bool needs_redraw);
 // Weather city page handling
 // 返回值：0=继续停留在城市选择页，1=返回天气页，2=确认切换城市并返回天气页
 int handleWeatherCityPage(Renderer *renderer, UIAction action, bool needs_redraw);
+
+// 空白页面处理（测试用，绘制45°斜线）
+// 返回值：0=继续停留在空白页，1=返回主页面
+int handleBlankPage(Renderer *renderer, UIAction action, bool needs_redraw);
 
 // 切换全刷周期（循环）
 void screen_cycle_full_refresh_period(bool refresh);

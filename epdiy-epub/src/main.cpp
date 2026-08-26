@@ -782,7 +782,12 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
       else if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_OPEN_LIBRARY)
       {
         ui_state = SELECTING_EPUB;
-        handleEpubList(renderer, NONE, true);      
+        handleEpubList(renderer, NONE, true);
+      }
+      else if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_BLANK_PAGE)
+      {
+        ui_state = BLANK_PAGE;
+        handleBlankPage(renderer, NONE, true);
       }
       break;
     case READING_EPUB:
@@ -837,6 +842,16 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
         }
         break;
       }
+    case BLANK_PAGE:
+      {
+        int r = handleBlankPage(renderer, ui_action, needs_redraw);
+        if (r == 1)
+        {
+          ui_state = MAIN_PAGE;
+          handleMainPage(renderer, NONE, true);
+        }
+        break;
+      }
     case SELECTING_TABLE_CONTENTS:
         handleEpubTableContents(renderer, ui_action, needs_redraw);
         break;
@@ -871,6 +886,9 @@ static void request_flush(void)
 {
   if (renderer)
     renderer->flush_display();
+
+  // 手动触发 assert 以便导出 crash dump（调试用，完成后删除）
+  //RT_ASSERT(0);//调试用
 }
 
 const char* getCurrentPageName() {
@@ -888,12 +906,14 @@ const char* getCurrentPageName() {
     case LOW_POWER_PAGE: return "LOW_POWER_PAGE";
     case CHARGING_PAGE: return "CHARGING_PAGE";
     case SHUTDOWN_PAGE: return "SHUTDOWN_PAGE";
+    case BLANK_PAGE:    return "BLANK_PAGE";
     default:            return "UNKNOWN_PAGE";
   }
 }
 
 void back_to_main_page()
 {
+//  RT_ASSERT(0);//调试用
   if (ui_state == MAIN_PAGE) 
   {
     rt_kprintf("已经在主页面，无需返回\n");
@@ -918,6 +938,7 @@ void back_to_main_page()
   draw_status_bar(renderer, battery);
   touch_controls->render(renderer);
   request_flush();
+  //RT_ASSERT(0);//调试用
 }
 
 void draw_welcome_page(Battery *battery)
@@ -1170,9 +1191,9 @@ void main_task(void *param)
             epd_font_ft_preheat_stop();
             // SD 卡电源保护：
             // 如果操作前后都停留在不需要 SD 卡的页面，跳过 sleep 以避免下次 wakeup 卡顿
-            bool stayed_in_no_fs_page = 
-                (state_before == MAIN_PAGE || state_before == SETTINGS_PAGE || state_before == READING_SETTINGS) &&
-                (ui_state == MAIN_PAGE || ui_state == SETTINGS_PAGE || ui_state == READING_SETTINGS);
+            bool stayed_in_no_fs_page =
+                (state_before == MAIN_PAGE || state_before == SETTINGS_PAGE || state_before == READING_SETTINGS || state_before == BLANK_PAGE) &&
+                (ui_state == MAIN_PAGE || ui_state == SETTINGS_PAGE || ui_state == READING_SETTINGS || ui_state == BLANK_PAGE);
             if (!stayed_in_no_fs_page &&
                 !epd_font_ft_preheat_is_running() &&
                 !(ui_state == READING_EPUB && reader != nullptr && reader->has_pending_layout())) {
