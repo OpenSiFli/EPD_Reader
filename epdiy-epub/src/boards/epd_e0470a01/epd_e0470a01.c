@@ -48,7 +48,7 @@ static enum EpdRotation display_rotation = EPD_ROT_LANDSCAPE;
 static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
 {
     .lcd_itf = LCDC_INTF_EPD_16BIT,
-    .freq = 24 * 1000 * 1000, //sclk frequnecy  41.7ns/cycle
+    .freq = 32 * 1000 * 1000, //sclk frequnecy  41.7ns/cycle
     .color_mode = LCDC_PIXEL_FORMAT_F2_SWAP,
 
     .cfg = {
@@ -64,15 +64,15 @@ static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
 
             //     (LSL+LBL+LDL+LEL) >= 24MHz/200k  = 120    <=200KHz
             //     (LSL+LBL+LDL+LEL) = 8+10+152+2 = 172
-            .LSL = 15, //Line start length   300ns
-            .LBL = 10, //Line begin length
+            .LSL = 8, //Line start length   300ns
+            .LBL = 5, //Line begin length
             .LDL = 1216/8, //Line data length: 
-            .LEL = 50, //Line end length      
+            .LEL = 1, //Line end length      
 
             .GSTA = 3, //Gate STA length
 
             .FSL = 1, //Frame sync length
-            .FBL = 5, //Frame begin length    100ns  ->  
+            .FBL = 3, //Frame begin length    100ns  ->  
             .FDL = 684, //Frame data length (684 rows)
             .FEL = 1, //Frame end length
 
@@ -228,23 +228,28 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
             }
         }
         else
-        {
-             uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 4; // 每次处理4像素（4字节）
-            uint32_t *p_dst32 = (uint32_t *)(mixed_framebuffer);
+        {//16bit 特殊处理
+            uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 8; // 每次处理8像素（8字节）
+            uint64_t *p_dst64 = (uint64_t *)(mixed_framebuffer);
 
             while (n--)
             {
                 uint8_t byte0 = *p_src++;
                 uint8_t byte1 = *p_src++;
+                uint8_t byte2 = *p_src++;
+                uint8_t byte3 = *p_src++;
 
-                // 生成4像素的新值
-                uint32_t src_v = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
 
+                // 生成8像素的新值
+                uint32_t src_v_1 = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
+                uint32_t src_v_2 = ((byte3 << 20) | (byte3 << 16) | (byte2 << 4) | byte2) & 0x0F0F0F0F;
+
+                uint64_t src_v = ((uint64_t)src_v_1 << 32) | src_v_2;
                 // 读取原像素，旧像素清零，新像素移入老像素
-                uint32_t dst_v = (*p_dst32 & 0x0F0F0F0F) << 4;
+                uint64_t dst_v = (*p_dst64 & 0x0F0F0F0F0F0F0F0FULL) << 4;
 
                 // 合并新像素
-                *p_dst32++ = dst_v | src_v;
+                *p_dst64++ = dst_v | src_v;
             }
     //         uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 8; // 每次处理8像素
     //         uint64_t *p_dst64 = (uint64_t *)(mixed_framebuffer);
