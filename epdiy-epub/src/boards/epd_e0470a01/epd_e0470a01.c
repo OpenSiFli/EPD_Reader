@@ -228,56 +228,48 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
             }
         }
         else
-        {//16bit 特殊处理
-            uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 8; // 每次处理8像素（8字节）
-            uint64_t *p_dst64 = (uint64_t *)(mixed_framebuffer);
+        {
+            uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 4; // 每次处理4像素（4字节）
+            uint32_t *p_dst32 = (uint32_t *)(mixed_framebuffer);
 
             while (n--)
             {
                 uint8_t byte0 = *p_src++;
                 uint8_t byte1 = *p_src++;
-                uint8_t byte2 = *p_src++;
-                uint8_t byte3 = *p_src++;
 
+                // 生成4像素的新值
+                uint32_t src_v = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
 
-                // 生成8像素的新值
-                uint32_t src_v_1 = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
-                uint32_t src_v_2 = ((byte3 << 20) | (byte3 << 16) | (byte2 << 4) | byte2) & 0x0F0F0F0F;
-
-                uint64_t src_v = ((uint64_t)src_v_1 << 32) | src_v_2;
                 // 读取原像素，旧像素清零，新像素移入老像素
-                uint64_t dst_v = (*p_dst64 & 0x0F0F0F0F0F0F0F0FULL) << 4;
+                uint32_t dst_v = (*p_dst32 & 0x0F0F0F0F) << 4;
 
                 // 合并新像素
-                *p_dst64++ = dst_v | src_v;
+                *p_dst32++ = dst_v | src_v;
             }
-    //         uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 8; // 每次处理8像素
-    //         uint64_t *p_dst64 = (uint64_t *)(mixed_framebuffer);
+            
+            //16bit 特殊处理
+            // uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 8; // 每次处理8像素（8字节）
+            // uint64_t *p_dst64 = (uint64_t *)(mixed_framebuffer);
 
-    // while (n--)
-    // {
-    //     uint8_t byte0 = *p_src++;
-    //     uint8_t byte1 = *p_src++;
-    //     uint8_t byte2 = *p_src++;
-    //     uint8_t byte3 = *p_src++;
+            // while (n--)
+            // {
+            //     uint8_t byte0 = *p_src++;
+            //     uint8_t byte1 = *p_src++;
+            //     uint8_t byte2 = *p_src++;
+            //     uint8_t byte3 = *p_src++;
 
-    //     // 8个新像素分别放入低4位
-    //     uint64_t src_v = (((uint64_t)(byte3 >> 4))     ) |
-    //                      (((uint64_t)(byte3 & 0x0F)) << 8) |
-    //                      (((uint64_t)(byte2 >> 4)) << 16) |
-    //                      (((uint64_t)(byte2 & 0x0F)) << 24) |
-    //                      (((uint64_t)(byte1 >> 4)) << 32) |
-    //                      (((uint64_t)(byte1 & 0x0F)) << 40) |
-    //                      (((uint64_t)(byte0 >> 4)) << 48) |
-    //                      (((uint64_t)(byte0 & 0x0F)) << 56);
-    //     src_v &= 0x0F0F0F0F0F0F0F0FULL;
 
-    //     // 旧像素左移4位（从低 nibble 移到高 nibble）
-    //     uint64_t dst_v = (*p_dst64 & 0x0F0F0F0F0F0F0F0FULL) << 4;
+            //     // 生成8像素的新值
+            //     uint32_t src_v_1 = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
+            //     uint32_t src_v_2 = ((byte3 << 20) | (byte3 << 16) | (byte2 << 4) | byte2) & 0x0F0F0F0F;
 
-    //     // 合并：高nibble=旧, 低nibble=新
-    //     *p_dst64++ = dst_v | src_v;
-    // }
+            //     uint64_t src_v = ((uint64_t)src_v_1 << 32) | src_v_2;
+            //     // 读取原像素，旧像素清零，新像素移入老像素
+            //     uint64_t dst_v = (*p_dst64 & 0x0F0F0F0F0F0F0F0FULL) << 4;
+
+            //     // 合并新像素
+            //     *p_dst64++ = dst_v | src_v;
+        
         }
     }
     else if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_RGB565)
