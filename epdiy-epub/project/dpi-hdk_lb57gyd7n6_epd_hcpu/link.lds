@@ -199,6 +199,7 @@ SECTIONS
     *(.font_data)
     KEEP(*(.SECTION_TTF_HEADER.*))
     KEEP(*(.SECTION_TTF.*))
+
   } > ROM2
 
 

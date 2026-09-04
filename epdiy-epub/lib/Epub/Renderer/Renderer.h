@@ -49,7 +49,11 @@ public:
   virtual int get_page_height() = 0;
   virtual int get_space_width() = 0;
   virtual int get_line_height() = 0;
-  // set margins
+  // margins
+  int get_margin_top() const { return margin_top; }
+  int get_margin_bottom() const { return margin_bottom; }
+  int get_margin_left() const { return margin_left; }
+  int get_margin_right() const { return margin_right; }
   void set_margin_top(int margin_top) { this->margin_top = margin_top; }
   void set_margin_bottom(int margin_bottom) { this->margin_bottom = margin_bottom; }
   void set_margin_left(int margin_left) { this->margin_left = margin_left; }

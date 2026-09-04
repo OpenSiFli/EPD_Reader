@@ -11,6 +11,7 @@
 #include "boards/SF32PaperRenderer.h"
 #include "gui_app_pm.h"
 #include "bf0_pm.h"
+#include "bf0_hal_aon.h"
 #include "epd_driver.h"
 #include "type.h"
 #include "reading_settings.h"
@@ -35,6 +36,7 @@ extern "C"
   int main();
   rt_uint32_t heap_free_size(void);
   extern void set_part_disp_times(int val);
+  extern void BSP_TP_PowerUp(void);
   extern const uint8_t low_power_map[];
   extern const uint8_t chargeing_map[];
   extern const uint8_t welcome_map[];
@@ -707,7 +709,8 @@ void draw_status_bar(Renderer *renderer, Battery *battery)
   if (battery)
   {
     draw_charge_status(renderer, battery);
-    draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
+    // TODO: 暂不读ADC，避免频繁唤醒。电量图标由 MSG_BATTERY_CHECK 定时器更新。
+    // draw_battery_level(renderer, battery->get_voltage(), battery->get_percentage());
   }
 }
 
@@ -782,7 +785,7 @@ void handleUserInteraction(Renderer *renderer, UIAction ui_action, bool needs_re
       else if (ui_action == SELECT && screen_get_main_selected_option() == OPTION_OPEN_LIBRARY)
       {
         ui_state = SELECTING_EPUB;
-        handleEpubList(renderer, NONE, true);      
+        handleEpubList(renderer, NONE, true);
       }
       break;
     case READING_EPUB:
@@ -871,6 +874,9 @@ static void request_flush(void)
 {
   if (renderer)
     renderer->flush_display();
+
+  // 手动触发 assert 以便导出 crash dump（调试用，完成后删除）
+  //RT_ASSERT(0);//调试用
 }
 
 const char* getCurrentPageName() {
@@ -888,12 +894,14 @@ const char* getCurrentPageName() {
     case LOW_POWER_PAGE: return "LOW_POWER_PAGE";
     case CHARGING_PAGE: return "CHARGING_PAGE";
     case SHUTDOWN_PAGE: return "SHUTDOWN_PAGE";
+    case BLANK_PAGE:    return "BLANK_PAGE";
     default:            return "UNKNOWN_PAGE";
   }
 }
 
 void back_to_main_page()
 {
+//  RT_ASSERT(0);//调试用
   if (ui_state == MAIN_PAGE) 
   {
     rt_kprintf("已经在主页面，无需返回\n");
@@ -918,6 +926,7 @@ void back_to_main_page()
   draw_status_bar(renderer, battery);
   touch_controls->render(renderer);
   request_flush();
+  //RT_ASSERT(0);//调试用
 }
 
 void draw_welcome_page(Battery *battery)
@@ -987,6 +996,8 @@ void draw_shutdown_page()
 
 void main_task(void *param)
 {
+
+
   ulog_i("main", "Powering up the board");
   Board *board = Board::factory();
   board->power_up();
@@ -1073,25 +1084,26 @@ void main_task(void *param)
       UIAction ui_action = (UIAction)msg_data;
     
       if (ui_action == MSG_UPDATE_CHARGE_STATUS)
-      {       
-        if (battery)
-        {
-            int percentage = battery->get_percentage();
-            if (percentage >= 98 && charge_full == false) 
-            {
-                clear_charge_icon(renderer);
-                request_flush();
-                charge_full = true;
-                rt_kprintf("Battery level is full, skip sending charge status update message\n");
-            }
-            else if(percentage < 98)
-            {
-                rt_kprintf("Charge status changed\n");
-                charge_full = false;
-              draw_status_bar(renderer, battery);
-                request_flush();
-            }        
-        }
+      {
+        // TODO: 充电器插拔通知，暂不读ADC，等 MSG_BATTERY_CHECK 定时器统一处理
+        // if (battery)
+        // {
+        //     int percentage = battery->get_percentage();
+        //     if (percentage >= 98 && charge_full == false)
+        //     {
+        //         clear_charge_icon(renderer);
+        //         request_flush();
+        //         charge_full = true;
+        //         rt_kprintf("Battery level is full, skip sending charge status update message\n");
+        //     }
+        //     else if(percentage < 98)
+        //     {
+        //         rt_kprintf("Charge status changed\n");
+        //         charge_full = false;
+        //       draw_status_bar(renderer, battery);
+        //         request_flush();
+        //     }
+        // }
 
         continue;
       }
@@ -1122,6 +1134,13 @@ void main_task(void *param)
             rt_mq_send(ui_queue, &msg, sizeof(UIAction));
           }
 #endif
+          // 更新缓存，供主循环末尾判断是否需要刷新状态栏
+          if (percentage != last_battery_percent || is_charging != last_battery_charging) {
+            last_battery_percent = percentage;
+            last_battery_charging = is_charging;
+            draw_status_bar(renderer, battery);
+            request_flush();
+          }
         }
         continue;
       }
@@ -1170,9 +1189,9 @@ void main_task(void *param)
             epd_font_ft_preheat_stop();
             // SD 卡电源保护：
             // 如果操作前后都停留在不需要 SD 卡的页面，跳过 sleep 以避免下次 wakeup 卡顿
-            bool stayed_in_no_fs_page = 
-                (state_before == MAIN_PAGE || state_before == SETTINGS_PAGE || state_before == READING_SETTINGS) &&
-                (ui_state == MAIN_PAGE || ui_state == SETTINGS_PAGE || ui_state == READING_SETTINGS);
+            bool stayed_in_no_fs_page =
+                (state_before == MAIN_PAGE || state_before == SETTINGS_PAGE || state_before == READING_SETTINGS || state_before == BLANK_PAGE) &&
+                (ui_state == MAIN_PAGE || ui_state == SETTINGS_PAGE || ui_state == READING_SETTINGS || ui_state == BLANK_PAGE);
             if (!stayed_in_no_fs_page &&
                 !epd_font_ft_preheat_is_running() &&
                 !(ui_state == READING_EPUB && reader != nullptr && reader->has_pending_layout())) {
@@ -1245,10 +1264,10 @@ void main_task(void *param)
           (void)handleSettingsPage(renderer, NONE, true);
       }
       draw_status_bar(renderer, battery);
-      if (battery) {
-        last_battery_percent = battery->get_percentage();
-        last_battery_charging = battery->is_charging();
-      }
+      // if (battery) {
+      //   last_battery_percent = battery->get_percentage();
+      //   last_battery_charging = battery->is_charging();
+      // }
       request_flush();
 
     } else {
@@ -1278,19 +1297,20 @@ void main_task(void *param)
     }
 
     // 电池状态 + 刷屏（仅在电量百分比或充电状态变化时才刷新）
-    if (battery) {
-      int cur_percent = battery->get_percentage();
-      bool cur_charging = battery->is_charging();
-      if (cur_percent != last_battery_percent || cur_charging != last_battery_charging) {
-        ulog_i("main", "Battery changed: %d%%->%d%%, charging=%d->%d",
-               last_battery_percent, cur_percent,
-               last_battery_charging, cur_charging);
-        draw_status_bar(renderer, battery);
-        request_flush();
-        last_battery_percent = cur_percent;
-        last_battery_charging = cur_charging;
-      }
-    }
+    // TODO: 暂不读ADC，避免每500ms唤醒一次。电池检测由 MSG_BATTERY_CHECK（10秒定时器）统一处理。
+    // if (battery) {
+    //   int cur_percent = battery->get_percentage();
+    //   bool cur_charging = battery->is_charging();
+    //   if (cur_percent != last_battery_percent || cur_charging != last_battery_charging) {
+    //     ulog_i("main", "Battery changed: %d%%->%d%%, charging=%d->%d",
+    //            last_battery_percent, cur_percent,
+    //            last_battery_charging, cur_charging);
+    //     draw_status_bar(renderer, battery);
+    //     request_flush();
+    //     last_battery_percent = cur_percent;
+    //     last_battery_charging = cur_charging;
+    //   }
+    // }
     // 每次主循环迭代末尾短暂延时，给予低优先级线程机会运行，避免互相饿死
     rt_thread_mdelay(50);
   }
@@ -1303,13 +1323,20 @@ void main_task(void *param)
   board->prepare_to_sleep();
   ulog_i("main", "Entering deep sleep");
   rt_thread_delay(rt_tick_from_millisecond(500));
+
+  // 从 deep sleep 唤醒后，恢复触摸屏和 GPIO1 AON 唤醒源
+  ulog_i("main", "Woke up, restoring touch");
+  BSP_TP_PowerUp();
+  HAL_HPAON_EnableWakeupSrc(HPAON_WAKEUP_SRC_GPIO1, AON_PIN_MODE_HIGH);
 }
 
 extern "C"
 {
   int main()
   {
-    rt_pm_request(PM_SLEEP_MODE_IDLE); 
+    // 不要 request IDLE — 它会阻止 PM policy 选择更深的 sleep mode。
+    // PM policy 已配好 {30ms, DeepSleep}，空闲超过30ms自动进 DeepSleep。
+    // rt_pm_request(PM_SLEEP_MODE_IDLE);
     ulog_i("main", "epub list state num_epubs=%d", epub_list_state.num_epubs);
     ulog_i("main", "epub list state is_loaded=%d", epub_list_state.is_loaded);
     ulog_i("main", "epub list state selected_item=%d", epub_list_state.selected_item);

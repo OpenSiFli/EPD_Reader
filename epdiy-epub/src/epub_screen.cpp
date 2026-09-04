@@ -937,3 +937,4 @@ int handleWeatherCityPage(Renderer *renderer, UIAction action, bool needs_redraw
 
   return 0;
 }
+

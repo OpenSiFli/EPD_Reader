@@ -14,11 +14,14 @@
 #include "mem_section.h"
 #include "epd_waveform.h"
 
-/* Panel native (TCON output) resolution */
-#define EPD_PANEL_HOR 1024
-#define EPD_PANEL_VER 758
+/**
+  * @brief epd_opm060da chip IDs
+  */
+#define THE_LCD_ID                  0x19355
 
-/* Rotation mode (from V12 epd_display.c logic) */
+#define  DBG_LEVEL            DBG_INFO  //DBG_LOG //
+#define LOG_TAG                "epd_opm060da"
+#include "log.h"
 enum EpdRotation
 {
     EPD_ROT_LANDSCAPE = 0,
@@ -27,32 +30,25 @@ enum EpdRotation
     EPD_ROT_INVERTED_PORTRAIT = 3,
 };
 
-/*
- * LVGL: HOR=758, VER=1024 (portrait). Panel: 1024x758 (landscape).
- * EPD_PANEL_HOR(1024) == LCD_VER_RES_MAX(1024) → rotate 90° CW
- */
+
 #if (EPD_PANEL_HOR == LCD_VER_RES_MAX) && (EPD_PANEL_VER == LCD_HOR_RES_MAX)
     #define DISPLAY_ROTATE EPD_ROT_INVERTED_PORTRAIT
 #else
     #define DISPLAY_ROTATE EPD_ROT_LANDSCAPE
 #endif
 
+
 static enum EpdRotation display_rotation = EPD_ROT_LANDSCAPE;
-
-/**
-  * @brief epd_opm060da chip IDs
-  */
-#define THE_LCD_ID                  0x19386
-
-#define  DBG_LEVEL            DBG_INFO  //DBG_LOG //
-#define LOG_TAG                "epd_opm060da"
-#include "log.h"
+/* Panel native (TCON output) resolution */
+#define EPD_PANEL_HOR 1216
+#define EPD_PANEL_VER 684
 
 
-static const LCDC_InitTypeDef lcdc_int_cfg_edp_8bit =
+
+static const LCDC_InitTypeDef lcdc_int_cfg_edp_16bit =
 {
-    .lcd_itf = LCDC_INTF_EPD_8BIT,
-    .freq = 40 * 1000 * 1000, //sclk frequnecy
+    .lcd_itf = LCDC_INTF_EPD_16BIT,
+    .freq = 32 * 1000 * 1000, //sclk frequnecy  41.7ns/cycle
     .color_mode = LCDC_PIXEL_FORMAT_F2_SWAP,
 
     .cfg = {
@@ -66,17 +62,20 @@ static const LCDC_InitTypeDef lcdc_int_cfg_edp_8bit =
             .GDSP_polarity = 0,
             .GDCLK_polarity = 0, //Gate clock polarity
 
-            .LSL = 1, //Line start length
-            .LBL = 4, //Line begin length
-            .LDL = EPD_PANEL_HOR >> 2, //Line data length (1024 / 4)
-            .LEL = 9, //Line end length
+            //     (LSL+LBL+LDL+LEL) >= 24MHz/200k  = 120    <=200KHz
+            //     (LSL+LBL+LDL+LEL) = 8+10+152+2 = 172
+            .LSL = 8, //Line start length   300ns
+            .LBL = 5, //Line begin length
+            .LDL = 1216/8, //Line data length: 
+            .LEL = 1, //Line end length      
 
-            .GSTA = 7, //Gate STA length
+            .GSTA = 3, //Gate STA length
 
             .FSL = 1, //Frame sync length
-            .FBL = 3, //Frame begin length
-            .FDL = EPD_PANEL_VER, //Frame data length (758 rows)
-            .FEL = 5, //Frame end length
+            .FBL = 3, //Frame begin length    100ns  ->  
+            .FDL = 684, //Frame data length (684 rows)
+            .FEL = 1, //Frame end length
+
         },
     },
 
@@ -104,7 +103,7 @@ static void LCD_Init(LCDC_HandleTypeDef *hlcdc)
 {
     uint8_t parameter[32];
 
-    memcpy(&lcdc_int_cfg, &lcdc_int_cfg_edp_8bit, sizeof(lcdc_int_cfg));
+    memcpy(&lcdc_int_cfg, &lcdc_int_cfg_edp_16bit, sizeof(lcdc_int_cfg));
     memcpy(&hlcdc->Init, &lcdc_int_cfg, sizeof(LCDC_InitTypeDef));
     HAL_LCDC_Init(hlcdc);
 
@@ -209,8 +208,7 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
 
         if (display_rotation == EPD_ROT_INVERTED_PORTRAIT)
         {
-            // 把竖屏帧缓冲 758x1024 旋转成面板横屏 1024x758
-            // 源像素 (x, y) → 面板像素 (y, 757-x)
+
             uint16_t src_w = LCD_HOR_RES_MAX; // 758
 
             for (uint16_t x = Xpos0; x <= Xpos1; x++)
@@ -248,6 +246,30 @@ L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef
                 // 合并新像素
                 *p_dst32++ = dst_v | src_v;
             }
+            
+            //16bit 特殊处理
+            // uint32_t n = LCD_HOR_RES_MAX * LCD_VER_RES_MAX / 8; // 每次处理8像素（8字节）
+            // uint64_t *p_dst64 = (uint64_t *)(mixed_framebuffer);
+
+            // while (n--)
+            // {
+            //     uint8_t byte0 = *p_src++;
+            //     uint8_t byte1 = *p_src++;
+            //     uint8_t byte2 = *p_src++;
+            //     uint8_t byte3 = *p_src++;
+
+
+            //     // 生成8像素的新值
+            //     uint32_t src_v_1 = ((byte1 << 20) | (byte1 << 16) | (byte0 << 4) | byte0) & 0x0F0F0F0F;
+            //     uint32_t src_v_2 = ((byte3 << 20) | (byte3 << 16) | (byte2 << 4) | byte2) & 0x0F0F0F0F;
+
+            //     uint64_t src_v = ((uint64_t)src_v_1 << 32) | src_v_2;
+            //     // 读取原像素，旧像素清零，新像素移入老像素
+            //     uint64_t dst_v = (*p_dst64 & 0x0F0F0F0F0F0F0F0FULL) << 4;
+
+            //     // 合并新像素
+            //     *p_dst64++ = dst_v | src_v;
+        
         }
     }
     else if (hlcdc->Layer[HAL_LCDC_LAYER_DEFAULT].data_format == LCDC_PIXEL_FORMAT_RGB565)
@@ -470,5 +492,6 @@ static const LCD_DrvOpsDef lcd_drv_operations =
     NULL
 };
 
-LCD_DRIVER_EXPORT2(epd_opm060da, THE_LCD_ID, &lcdc_int_cfg,
+LCD_DRIVER_EXPORT2(epd_e0470a01, THE_LCD_ID, &lcdc_int_cfg,
                    &lcd_drv_operations, 1);
+
