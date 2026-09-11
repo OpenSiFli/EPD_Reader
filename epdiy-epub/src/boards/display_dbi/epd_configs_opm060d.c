@@ -146,7 +146,7 @@ uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
             wave_table_mode = WAVE_MODE_FULL;
             break;
         case EPD_DRAW_MODE_PARTIAL:
-            wave_table_mode = WAVE_MODE_PARTIAL;
+            wave_table_mode = 9;
             break;
         default:
             rt_kprintf("Unknown EPD draw mode: %d, use WAVE_MODE_FULL mode\n", mode);

@@ -10,11 +10,22 @@ typedef enum{
 }EPD_WAVEFORM_ERR_TYPEDEF;
 
 
+
+/*
+E0470A03 Waveform Table Mode:
+mode 0: GC16 FULL   // 全刷
+mode 1: DU PARTIAL  // 黑白刷新，黑白2阶
+mode 3: INIT        // 刷新全白页面，初始化页面使用
+mode 5: GL16        // 16灰阶
+mode 6: A2          // 动画模式，黑白2阶
+mode 7: DU4         // DU ，4级灰	
+*/
+
 typedef enum{
     WAVE_MODE_NONE    = 0,
-    WAVE_MODE_PARTIAL = 1,
-    WAVE_MODE_FULL    = 2,
-    /* 2~15 Ϊ��ȷ���Ĳ���ģʽ */
+    WAVE_MODE_PARTIAL = 5,   
+    WAVE_MODE_FULL    = 0,   
+
     WAVE_MODE_MAX = 16
 } WAVE_TABLE_MODE_T;
 

@@ -14,6 +14,8 @@ extern "C" {
 #include "bf0_hal_aon.h"
 #include "spi_msd.h"
 #include "bf0_pm.h"
+extern void BSP_TP_PowerUp(void);
+extern void BSP_TP_PowerDown(void);
 #ifndef _WIN32
     #include "drv_flash.h"
 #endif /* _WIN32 */
@@ -118,14 +120,19 @@ void SF32Paper::prepare_to_sleep()
 #ifdef RT_USING_SPI_MSD
     SD_card_power_off();
 #endif
-    if (battery) 
+    if (battery)
     {
 #ifndef SF32LB57X
         ADCBattery* adc_battery = static_cast<ADCBattery*>(battery);
         adc_battery->stop_battery_monitor();
 #endif
     }
-   
+
+    // 关闭触摸屏，防止 GT967 INT 引脚不停产生中断唤醒系统
+    BSP_TP_PowerDown();
+    // 禁用 GPIO1 AON 唤醒源（触摸 IRQ 在 GPIO1 端口上）
+    HAL_HPAON_DisableWakeupSrc(HPAON_WAKEUP_SRC_GPIO1);
+
 #ifndef SF32LB57X
     PowerDownCustom();
 #endif

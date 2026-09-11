@@ -17,8 +17,13 @@
     #endif
 #endif
 
-#define PART_DISP_TIMES       10        // After PART_DISP_TIMES-1 partial refreshes, perform a full refresh once
+static int g_part_disp_times = 10;      // 每 g_part_disp_times 次刷新做一次全刷，其余局刷
 static int reflesh_times = 0;
+
+void set_part_disp_times(int val)
+{
+    g_part_disp_times = val > 0 ? val : 1;   // 0 表示每次全刷
+}
 
 // 8bit lookup table for the current frame (high 4 bits: old data, low 4 bits: new data).
 // The output is 2-bit data.
@@ -108,13 +113,26 @@ void epd_wave_table(void)
 
 uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
 {
+    reflesh_times++;
+
+    // AUTO 模式：每 g_part_disp_times 次做一次全刷，其余局刷
+    if (EPD_DRAW_MODE_AUTO == mode)
+    {
+        mode = (reflesh_times % g_part_disp_times == 0)
+               ? EPD_DRAW_MODE_FULL
+               : EPD_DRAW_MODE_PARTIAL;
+    }
+
 #ifdef EPD_WAVEFORM_USE_BIN
     if (epd_waveform_bin_inited_ret == 0)
     {
-        // 一直使用全刷波形
-        return waveform_bin_reader_get_frames(temperature, WAVE_MODE_FULL);
+        WAVE_TABLE_MODE_T wave_table_mode = (EPD_DRAW_MODE_PARTIAL == mode)
+                                            ? WAVE_MODE_PARTIAL
+                                            : WAVE_MODE_FULL;
+        return waveform_bin_reader_get_frames(temperature, wave_table_mode);
     }
 #endif
+
     const WaveTableEntry *wave_table = NULL;
     if (EPD_DRAW_MODE_PARTIAL == mode)
     {
@@ -130,7 +148,6 @@ uint32_t epd_wave_table_get_frames(int temperature, EpdDrawMode mode)
         wave_table = &full_wave_table;
     }
     p_current_wave_from = (const uint8_t *)&wave_table->wave_table[0][0];
-    reflesh_times++;
 
     return wave_table->frame_count;
 }

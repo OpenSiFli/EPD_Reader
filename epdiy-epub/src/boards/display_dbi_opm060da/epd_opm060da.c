@@ -52,7 +52,7 @@ static enum EpdRotation display_rotation = EPD_ROT_LANDSCAPE;
 static const LCDC_InitTypeDef lcdc_int_cfg_edp_8bit =
 {
     .lcd_itf = LCDC_INTF_EPD_8BIT,
-    .freq = 24 * 1000 * 1000, //sclk frequnecy
+    .freq = 40 * 1000 * 1000, //sclk frequnecy
     .color_mode = LCDC_PIXEL_FORMAT_F2_SWAP,
 
     .cfg = {
@@ -191,15 +191,6 @@ L2_NON_RET_BSS_SECT_BEGIN(frambuf)
 L2_NON_RET_BSS_SECT(frambuf, ALIGN(4) static uint8_t mixed_framebuffer[EPD_PANEL_HOR * EPD_PANEL_VER]);
 L2_NON_RET_BSS_SECT_END
 #endif
-
-/*
- * 57 屏驱通过波形表自动计算刷新帧数，无需外部设置部分刷新次数。
- * 保留空实现以兼容上层调用。
- */
-void set_part_disp_times(int val)
-{
-    (void)val;
-}
 
 L1_RET_CODE_SECT(epd_codes, static void CopyToMixedGrayBuffer(LCDC_HandleTypeDef *hlcdc, const uint8_t *RGBCode, uint16_t Xpos0, uint16_t Ypos0, uint16_t Xpos1, uint16_t Ypos1))
 {
