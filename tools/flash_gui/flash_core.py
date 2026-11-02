@@ -226,14 +226,15 @@ def load_package(path: Path) -> Package:
 
 
 def find_sftool() -> Path | None:
-    roots = [Path(getattr(sys, '_MEIPASS', Path(__file__).parent)), Path(sys.executable).parent,
-             Path(__file__).parent, Path.home()/'.sifli/tools/sftool/0.2.5']
+    roots = [Path(getattr(sys, '_MEIPASS', Path(__file__).parent/'backend')),
+             Path(__file__).parent/'backend', Path(sys.executable).parent, Path(__file__).parent]
     for root in roots:
         candidate = root/'sftool.exe'
         if candidate.is_file():
             return candidate
-    found = shutil.which('sftool')
-    return Path(found) if found else None
+    # Do not silently select an installed/PATH copy of the affected old 0.2.5.
+    # External tools can still be selected explicitly in the GUI.
+    return None
 
 
 def command(tool: Path, port: str, chip: str, memory: str, baud: str,

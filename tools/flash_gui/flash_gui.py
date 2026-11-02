@@ -14,7 +14,7 @@ from serial.tools import list_ports
 from flash_core import AFTER, BEFORE, CHIPS, MEMORIES, Image, address, command, find_sftool, load_package, run, validate
 from usb_core import Cancelled, prepare_update, recovery_port, run_usb, select_targets
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 
 
 class App(tk.Tk):

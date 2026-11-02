@@ -5,9 +5,10 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 import zipfile
 
-from flash_core import Image, address, command, load_package, read_text, run, validate
+from flash_core import Image, address, command, find_sftool, load_package, read_text, run, validate
 
 
 class Tests(unittest.TestCase):
@@ -42,6 +43,26 @@ class Tests(unittest.TestCase):
         self.assertEqual(extracted.read_bytes(), bytes(range(256)))
         p.close()
         self.assertFalse(extracted.exists())
+
+    def test_bundled_backend_takes_precedence(self):
+        bundle = self.root/'bundle'
+        bundle.mkdir()
+        expected = bundle/'sftool.exe'
+        expected.write_bytes(b'fixed backend')
+        with patch.object(sys, '_MEIPASS', str(bundle), create=True):
+            self.assertEqual(find_sftool(), expected)
+
+    def test_old_installed_backend_is_not_selected_automatically(self):
+        old = self.root/'.sifli/tools/sftool/0.2.5/sftool.exe'
+        old.parent.mkdir(parents=True)
+        old.write_bytes(b'old backend')
+        with patch.object(sys, '_MEIPASS', str(self.root/'empty'), create=True), \
+             patch.object(sys, 'executable', str(self.root/'python.exe')), \
+             patch('flash_core.__file__', str(self.root/'src/flash_core.py')), \
+             patch('flash_core.Path.home', return_value=self.root), \
+             patch('flash_core.shutil.which', return_value=str(old)) as search:
+            self.assertIsNone(find_sftool())
+            search.assert_not_called()
 
     def test_command_and_validation(self):
         p = load_package(self.manifest)

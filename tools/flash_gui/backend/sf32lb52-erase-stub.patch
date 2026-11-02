@@ -1,0 +1,84 @@
+diff --git a/sftool-lib/src/sf32lb52/mod.rs b/sftool-lib/src/sf32lb52/mod.rs
+index 9ce8eed..a9cc1dd 100644
+--- a/sftool-lib/src/sf32lb52/mod.rs
++++ b/sftool-lib/src/sf32lb52/mod.rs
+@@ -23,6 +23,36 @@ pub struct SF32LB52Tool {
+     pub port: Box<dyn SerialPort>,
+ }
+ 
++#[cfg(test)]
++mod erase_ack_tests {
++    use super::*;
++    use crate::common::serial_io::test_support::TestSerialPort;
++    use crate::progress::no_op_progress_sink;
++    use crate::{BeforeOperation, CancelToken};
++
++    fn tool(reply: &[u8]) -> SF32LB52Tool {
++        let (port, _) = TestSerialPort::from_bytes(reply);
++        SF32LB52Tool {
++            base: SifliToolBase::new_with_external_stub_and_cancel(
++                "test".into(), BeforeOperation::NoReset, "nor".into(),
++                1_000_000, 1, false, no_op_progress_sink(), None, CancelToken::new(),
++            ),
++            port: Box::new(port),
++        }
++    }
++
++    #[test]
++    fn single_final_ok_completes_erase() {
++        tool(b"OK\n").internal_erase_all(0x12000000).unwrap();
++    }
++
++    #[test]
++    fn final_fail_is_reported_without_waiting_for_another_ack() {
++        let error = tool(b"Fail\n").internal_erase_all(0x12000000).unwrap_err();
++        assert!(error.to_string().contains("returned Fail"), "{error}");
++    }
++}
++
+ // 为 SF32LB52Tool 实现 Send 和 Sync
+ // 注意：这假设串口操作在设计上是线程安全的，或者我们会确保同一时间只有一个线程访问
+ unsafe impl Send for SF32LB52Tool {}
+@@ -31,7 +61,7 @@ unsafe impl Sync for SF32LB52Tool {}
+ impl SF32LB52Tool {
+     /// 执行全部flash擦除的内部方法
+     pub fn internal_erase_all(&mut self, address: u32) -> Result<()> {
+-        use ram_command::{Command, RamCommand};
++        use ram_command::{Command, RamCommand, Response};
+ 
+         let progress = self.progress();
+         let spinner = progress.create_spinner(ProgressOperation::EraseFlash {
+@@ -40,14 +70,14 @@ impl SF32LB52Tool {
+         });
+ 
+         // 发送擦除所有命令
+-        let _ = self.command(Command::EraseAll { address });
+-
+-        let mut io = for_tool(self);
+-        io.wait_for_pattern(
+-            b"OK",
+-            Duration::from_millis(30_000),
+-            &format!("erasing flash at 0x{:08X}", address),
+-        )?;
++        // command() already waits for and consumes the final OK/Fail.
++        // Waiting for a second OK falsely reports a completed erase as a timeout.
++        let response = self.command(Command::EraseAll { address })?;
++        if response != Response::Ok {
++            return Err(crate::Error::protocol(format!(
++                "erase flash at 0x{address:08X} returned {response}"
++            )));
++        }
+ 
+         spinner.finish(ProgressStatus::Success);
+ 
+@@ -191,7 +221,9 @@ impl SF32LB52Tool {
+             }
+         };
+ 
+-        let packet_size = if self.base.compat { 256 } else { 64 * 1024 };
++        // MEMWrite adds eight bytes to a frame with a u16 payload length.
++        // A 64KiB data chunk silently overflows that header field.
++        let packet_size = if self.base.compat { 256 } else { 32 * 1024 };
+ 
+         let mut addr = 0x2005_A000;
+         let mut data = &stub.data[..];
