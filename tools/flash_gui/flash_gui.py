@@ -14,7 +14,7 @@ from serial.tools import list_ports
 from flash_core import AFTER, BEFORE, CHIPS, MEMORIES, Image, address, command, erase_command, find_sftool, load_package, run, validate
 from usb_core import Cancelled, prepare_update, recovery_port, run_usb, select_targets
 
-VERSION = '1.2.0'
+VERSION = '1.2.1'
 
 
 class App(tk.Tk):
@@ -122,11 +122,6 @@ class App(tk.Tk):
         check = ttk.Checkbutton(settings, text='写后校验', variable=self.verify)
         check.grid(row=1, column=7, columnspan=2, sticky='w', pady=(9, 0))
         self.controls.append(check)
-        ttk.Label(settings, text='sftool.exe').grid(row=2, column=0, sticky='w', pady=(9, 0))
-        tool = ttk.Entry(settings, textvariable=self.tool)
-        tool.grid(row=2, column=1, columnspan=7, sticky='ew', padx=6, pady=(9, 0))
-        self.controls.append(tool)
-        self.button(settings, '选择工具', self.choose_tool).grid(row=2, column=8, pady=(9, 0))
         settings.columnconfigure(1, weight=1)
 
         self.usb_settings = ttk.LabelFrame(self, text='原生 USB DFU · SF32LB527 阅读器', padding=10)
@@ -248,11 +243,6 @@ class App(tk.Tk):
         for image in images:
             self.put(image)
         self.refresh()
-
-    def choose_tool(self):
-        value = filedialog.askopenfilename(title='选择 SiFli sftool', filetypes=[('sftool', '*.exe'), ('所有文件', '*.*')])
-        if value:
-            self.tool.set(value)
 
     def choose_package(self):
         path = filedialog.askopenfilename(title='加载完整固件包或烧录清单', filetypes=[('固件包与清单', '*.zip *.json *.ini'), ('ZIP', '*.zip'), ('sftool JSON', '*.json'), ('ImgBurnList INI', '*.ini')])

@@ -1,10 +1,12 @@
-# SiFli 固件烧录工具 1.2.0
+# SiFli 固件烧录工具 1.2.1
 
 Windows 10/11 x64 图形工具，同时支持 sftool 串口烧录和 SF32LB527 阅读器的原生 USB DFU。已内置修正后的 sftool 0.2.5，无需安装 Python，也不需要手动替换后端。
 
 1.1.1 修复 SF32LB52 整片擦除完成后重复等待 `OK` 导致误报超时，以及默认 64KiB 下载分包超出 u16 帧长上限的问题（改为 32KiB）。修正版后端已在 COM36 新板验证整片擦除、4KiB 写入及独立读回、重新加载驱动；测试后 16MiB 全片读回与原始备份完全一致。内置后端来源、补丁及 EXE 哈希见 `backend-build.json`。原生 USB 仍复用独立的受保护恢复协议。
 
 1.2.0 新增界面上的“擦除 Flash…”入口，支持整片 NOR 擦除和指定范围擦除。
+
+1.2.1 固定使用单个 EXE 内置的修正版 sftool，移除工具路径输入框和“选择工具”按钮。只需运行 `SiFliFlashTool.exe`，无需安装或另选 sftool；不回退到电脑上的其他版本。
 
 ## 擦除 Flash
 
@@ -64,6 +66,6 @@ python -m unittest discover -s tools/flash_gui -p 'test_*.py' -v
 
 `build_backend.ps1` 在独立临时目录检出 `backend/source.json` 固定的上游提交，应用随附补丁，运行擦除应答回归并编译；生成 `backend/sftool.exe` 与 `backend/backend-build.json`。默认使用已验证的 debug 开发构建，可指定 `-Profile release` 优化构建。
 
-`build.ps1` 只打包与构建清单、补丁哈希一致的后端，不再默认使用用户目录或 PATH 中的旧工具。自定义后端路径时须同时指定 `-Sftool` 和对应的 `-BackendManifest`。打包时统一为内置 `sftool.exe`，运行后优先选择该内置文件；仍可在界面手动选择外部工具。上游项目为 https://github.com/OpenSiFli/sftool ，许可证见随附 `LICENSE-sftool`。
+`build.ps1` 只打包与构建清单、补丁哈希一致的后端。开发者构建时自定义后端路径须同时指定 `-Sftool` 和对应的 `-BackendManifest`。打包时统一为内置 `sftool.exe`，成品运行时只使用该内置文件，界面不提供外部工具选择。上游项目为 https://github.com/OpenSiFli/sftool ，许可证见随附 `LICENSE-sftool`。
 
 USB 帧、CRC、序号和板型校验直接复用 `tools/usb_dfu_527.py`，GUI 后端增加可中止读取和总进度。发布包 `source/` 包含这份共享模块；单独复制源码运行时请保持它与 `usb_core.py` 同目录，或保留仓库的目录结构。

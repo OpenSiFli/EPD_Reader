@@ -69,6 +69,11 @@ class GuiTests(unittest.TestCase):
                 self.assertIn('COM_TEST', self.ask.call_args.args[1])
                 self.assertIn('0x12FFFFFF', self.ask.call_args.args[1])
 
+    def test_embedded_tool_has_no_picker_or_path_input(self):
+        self.assertFalse(hasattr(self.app, 'choose_tool'))
+        self.assertNotIn('选择工具', [w.cget('text') for w in self.widgets(self.app, self.ttk.Button)])
+        self.assertNotIn(str(self.app.tool), [str(w.cget('textvariable')) for w in self.widgets(self.app, self.ttk.Entry)])
+
     def test_whole_flash_dispatch(self):
         dialog = self.dialog()
         next(w for w in self.widgets(dialog, self.ttk.Radiobutton) if w.cget('value') == 'all').invoke()

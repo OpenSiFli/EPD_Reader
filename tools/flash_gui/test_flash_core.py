@@ -64,6 +64,14 @@ class Tests(unittest.TestCase):
             self.assertIsNone(find_sftool())
             search.assert_not_called()
 
+    def test_missing_bundled_backend_never_falls_back_to_source(self):
+        backend = self.root/'src/backend'
+        backend.mkdir(parents=True)
+        (backend/'sftool.exe').write_bytes(b'source backend')
+        with patch.object(sys, '_MEIPASS', str(self.root/'missing-bundle'), create=True), \
+             patch('flash_core.__file__', str(self.root/'src/flash_core.py')):
+            self.assertIsNone(find_sftool())
+
     def test_command_and_validation(self):
         p = load_package(self.manifest)
         args = command(Path(sys.executable), 'COM34', p.chip, p.memory, '1000000', 'default_reset', 'soft_reset', True, p.images)

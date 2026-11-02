@@ -226,15 +226,9 @@ def load_package(path: Path) -> Package:
 
 
 def find_sftool() -> Path | None:
-    roots = [Path(getattr(sys, '_MEIPASS', Path(__file__).parent/'backend')),
-             Path(__file__).parent/'backend', Path(sys.executable).parent, Path(__file__).parent]
-    for root in roots:
-        candidate = root/'sftool.exe'
-        if candidate.is_file():
-            return candidate
-    # Do not silently select an installed/PATH copy of the affected old 0.2.5.
-    # External tools can still be selected explicitly in the GUI.
-    return None
+    root = Path(getattr(sys, '_MEIPASS', Path(__file__).parent/'backend'))
+    candidate = root/'sftool.exe'
+    return candidate if candidate.is_file() else None
 
 
 def command(tool: Path, port: str, chip: str, memory: str, baud: str,
@@ -249,7 +243,7 @@ def command(tool: Path, port: str, chip: str, memory: str, baud: str,
 def connection_command(tool: Path, port: str, chip: str, memory: str, baud: str,
                        before: str, after: str) -> list[str]:
     if not tool.is_file():
-        raise ValueError('请选择有效的 sftool.exe。')
+        raise ValueError('内置烧录组件缺失，请重新下载并运行完整工具；源码运行请先构建后端。')
     if not port or chip not in CHIPS or memory not in MEMORIES or before not in BEFORE or after not in AFTER:
         raise ValueError('请检查串口、芯片、存储类型和复位选项。')
     if not str(baud).isdigit() or not 9600 <= int(baud) <= 4000000:
