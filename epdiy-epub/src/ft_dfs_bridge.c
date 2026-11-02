@@ -5,7 +5,7 @@
  * 问题：FreeType 读取大字体(20MB)时在 loca/glyf/hmtx/cmap 四个表之间
  *       频繁跳跃读取。单缓冲窗口在表间跳转时立即失效。
  *
- * 方案：LRU 多槽缓冲 — 4 个独立的 16KB 缓冲槽，
+ * 方案：LRU 多槽缓冲 — 64 个独立的 1KB 对齐缓冲槽，
  *       自然对应 loca/glyf/hmtx/cmap 四个表的访问区域。
  *       每个表的连续读取在各自的槽内命中，互不干扰。
  *
@@ -21,14 +21,16 @@
 #include <dfs_file.h>
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
+#include "epub_mem.h"
 
 /*==========================================================================
  * 缓冲区配置
  *========================================================================*/
 
 #define FT_BUF_LO_SIZE     (64 * 1024)    /* 预读低区 */
-#define FT_SLOT_SIZE        (4 * 1024)     /* 每个槽 4KB — 减少 miss 时的读取代价 */
-#define FT_SLOT_COUNT       16              /* 16 个槽 — 更多槽位避免表间互相驱逐 */
+#define FT_SLOT_SIZE        1024           /* Two SD sectors: sparse glyph misses stay cheap. */
+#define FT_SLOT_COUNT       64             /* Same 64KiB budget, retain more table windows. */
 
 typedef struct {
     long     start;                /* 缓冲的文件起始偏移，-1 = 空槽 */
@@ -49,6 +51,7 @@ typedef struct {
     /* 高区：LRU 多槽 */
     FtBufSlot  slots[FT_SLOT_COUNT];
     int        age_counter;        /* 全局年龄计数器 */
+    unsigned hits,misses,read_bytes,open_ms;
 } ft_file_t;
 
 /*==========================================================================
@@ -57,6 +60,7 @@ typedef struct {
 
 struct dfs_fd* ft_fopen(const char* name, const char* mode)
 {
+    rt_tick_t started=rt_tick_get();
     (void)mode;
     int fd = open(name, O_RDONLY);
     if (fd < 0) return NULL;
@@ -78,12 +82,13 @@ struct dfs_fd* ft_fopen(const char* name, const char* mode)
         }
     }
 
-    ft_file_t *f = (ft_file_t *)rt_malloc(sizeof(ft_file_t));
+    ft_file_t *f = (ft_file_t *)epub_mem_malloc(sizeof(ft_file_t));
     if (!f) { close(fd); return NULL; }
 
     f->fd = fd;
     f->file_pos = 0;
     f->age_counter = 0;
+    f->hits=f->misses=f->read_bytes=0;
 
     /* 初始化所有槽为空 */
     for (int i = 0; i < FT_SLOT_COUNT; i++) {
@@ -94,17 +99,19 @@ struct dfs_fd* ft_fopen(const char* name, const char* mode)
 
     /* 获取文件大小 */
     f->file_size = lseek(fd, 0, SEEK_END);
-    lseek(fd, 0, SEEK_SET);
+    if(f->file_size<=0||lseek(fd,0,SEEK_SET)<0){close(fd);epub_mem_free(f);return NULL;}
 
     /* 预读文件头部 */
     int lo_to_read = (f->file_size < FT_BUF_LO_SIZE)
                    ? (int)f->file_size : FT_BUF_LO_SIZE;
     f->buf_lo_valid = read(fd, f->buf_lo, lo_to_read);
     if (f->buf_lo_valid < 0) f->buf_lo_valid = 0;
+    f->read_bytes=f->buf_lo_valid;f->open_ms=rt_tick_get()-started;
 
     rt_kprintf("[ft_io] Opened: size=%ld, preloaded=%d, slots=%dx%dKB\n",
                f->file_size, f->buf_lo_valid,
                FT_SLOT_COUNT, FT_SLOT_SIZE / 1024);
+    rt_kprintf("FONT_IO_OPEN ms=%u cache_bytes=%u memory=PSRAM\n",f->open_ms,(unsigned)sizeof(*f));
 
     return (struct dfs_fd *)f;
 }
@@ -113,9 +120,10 @@ int ft_fclose(struct dfs_fd* fp)
 {
     if (!fp) return -1;
     ft_file_t *f = (ft_file_t *)fp;
-    close(f->fd);
-    rt_free(f);
-    return 0;
+    int rc=close(f->fd);
+    rt_kprintf("FONT_IO_CLOSE hits=%u misses=%u disk_bytes=%u\n",f->hits,f->misses,f->read_bytes);
+    epub_mem_free(f);
+    return rc;
 }
 
 int ft_fseek(struct dfs_fd* fp, long offset, int whence)
@@ -123,14 +131,15 @@ int ft_fseek(struct dfs_fd* fp, long offset, int whence)
     if (!fp) return -1;
     ft_file_t *f = (ft_file_t *)fp;
 
-    long new_pos;
+    long base,new_pos;
     switch (whence) {
-    case SEEK_SET: new_pos = offset; break;
-    case SEEK_CUR: new_pos = f->file_pos + offset; break;
-    case SEEK_END: new_pos = f->file_size + offset; break;
+    case SEEK_SET: base=0; break;
+    case SEEK_CUR: base=f->file_pos; break;
+    case SEEK_END: base=f->file_size; break;
     default: return -1;
     }
-
+    if((offset>0&&base>LONG_MAX-offset)||(offset<0&&offset<-base))return -1;
+    new_pos=base+offset;if(new_pos<0||new_pos>f->file_size)return -1;
     f->file_pos = new_pos;
     return 0;
 }
@@ -183,6 +192,8 @@ static int slot_find_oldest(ft_file_t *f)
 static int slot_fill(ft_file_t *f, int slot_idx, long file_offset)
 {
     FtBufSlot *s = &f->slots[slot_idx];
+    file_offset=(file_offset/FT_SLOT_SIZE)*FT_SLOT_SIZE;
+    ++f->misses;
 
     if (lseek(f->fd, file_offset, SEEK_SET) < 0) {
         s->start = -1;
@@ -190,7 +201,12 @@ static int slot_fill(ft_file_t *f, int slot_idx, long file_offset)
         return -1;
     }
 
-    int n = read(f->fd, s->data, FT_SLOT_SIZE);
+    int n = 0;
+    while (n < FT_SLOT_SIZE) {
+        int got = read(f->fd, s->data+n, FT_SLOT_SIZE-n);
+        if (got <= 0) break;
+        n += got;
+    }
     if (n <= 0) {
         s->start = -1;
         s->valid = 0;
@@ -200,6 +216,7 @@ static int slot_fill(ft_file_t *f, int slot_idx, long file_offset)
     s->start = file_offset;
     s->valid = n;
     s->age = ++f->age_counter;
+    f->read_bytes+=n;
     return 0;
 }
 
@@ -208,7 +225,10 @@ size_t ft_fread(void* ptr, size_t size, size_t nitems, struct dfs_fd* fp)
     if (!fp || !ptr || size == 0 || nitems == 0) return 0;
     ft_file_t *f = (ft_file_t *)fp;
 
+    if(nitems>(size_t)-1/size)return 0;
     size_t total = size * nitems;
+    if(f->file_pos<0||f->file_pos>=f->file_size)return 0;
+    if(total>(size_t)(f->file_size-f->file_pos))total=f->file_size-f->file_pos;
     size_t done = 0;
     uint8_t *dst = (uint8_t *)ptr;
 
@@ -218,6 +238,7 @@ size_t ft_fread(void* ptr, size_t size, size_t nitems, struct dfs_fd* fp)
 
         /* ---- 优先级 1: 低区缓冲命中 ---- */
         if (pos >= 0 && pos < f->buf_lo_valid) {
+            ++f->hits;
             int avail = f->buf_lo_valid - (int)pos;
             int to_copy = (int)remain < avail ? (int)remain : avail;
             memcpy(dst + done, f->buf_lo + pos, to_copy);
@@ -229,6 +250,7 @@ size_t ft_fread(void* ptr, size_t size, size_t nitems, struct dfs_fd* fp)
         /* ---- 优先级 2: 多槽 LRU 命中 ---- */
         int hit = slot_find_hit(f, pos);
         if (hit >= 0) {
+            ++f->hits;
             FtBufSlot *s = &f->slots[hit];
             int buf_off = (int)(pos - s->start);
             int avail   = s->valid - buf_off;
@@ -241,7 +263,7 @@ size_t ft_fread(void* ptr, size_t size, size_t nitems, struct dfs_fd* fp)
 
         /* ---- 未命中：淘汰最老的槽，从文件填充 ---- */
         int victim = slot_find_oldest(f);
-        if (slot_fill(f, victim, pos) < 0) break;
+        if (slot_fill(f, victim, pos) < 0 || pos >= f->slots[victim].start+f->slots[victim].valid) break;
         /* 下次循环会从新填充的槽读取 */
     }
 

@@ -11,6 +11,7 @@ public:
   PageElement(int y_pos) : y_pos(y_pos) {}
   virtual ~PageElement() {}
   virtual void render(Renderer *renderer, Epub *epub) = 0;
+  virtual bool is_image() const {return false;}
 };
 
 // a line from a block element
@@ -36,6 +37,7 @@ public:
 class PageImage : public PageElement
 {
 public:
+  bool is_image() const override {return true;}
   // the block the image comes from
   ImageBlock *block;
 

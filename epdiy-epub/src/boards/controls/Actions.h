@@ -1,8 +1,11 @@
 #pragma once
 
 #include <functional>
+#include <stdint.h>
 
-typedef enum
+/* RT-Thread messages are read as uint32_t; keep the ABI stable with
+ * toolchains using -fshort-enums as well. */
+typedef enum : uint32_t
 {
   NONE,
   UP,

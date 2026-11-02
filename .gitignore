@@ -10,4 +10,5 @@
 .sconsign.dblite
 .DS_Store
 .idea
+/firmware-527/
 Kconfig.tmp

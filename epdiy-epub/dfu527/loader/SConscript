@@ -1,0 +1,35 @@
+import os
+from building import *
+Import('SIFLI_SDK')
+cwd=GetCurrentDir()
+src=[s for s in Glob('*.c') if os.path.basename(str(s)) not in ('recovery_screen.c','recovery_assets.c')]
+group=DefineGroup('Reader527Recovery',src,depend=[''],
+                  CPPPATH=[cwd,os.path.join(cwd,'../common')])
+if GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+    drivers=os.path.abspath(os.path.join(cwd,'../../src/boards/sf32lb527'))
+    wave=os.path.abspath(os.path.join(cwd,'../../waveform/e0470a03'))
+    def embed_assets(target,source,env):
+        with open(str(target[0]),'w',encoding='ascii') as out:
+            out.write('#include <stdint.h>\n')
+            for symbol,node in zip(('reader_recovery_wave','reader_recovery_bitmap'),source):
+                data=open(str(node),'rb').read()
+                out.write('const uint8_t %s[%d] = {\n'%(symbol,len(data)))
+                for at in range(0,len(data),32):
+                    out.write(','.join('0x%02x'%b for b in data[at:at+32])+',\n')
+                out.write('};\n')
+        return 0
+    env=GetCurrentEnv()
+    build=os.path.join(env.Dir('#').abspath,env['build_dir'])
+    panel=os.path.join(build,'panel')
+    env.VariantDir(panel,drivers,duplicate=0)
+    assets=env.Command(os.path.join(build,'recovery_assets.c'),
+        [os.path.join(wave,'epd_waveform.bin'),os.path.join(cwd,'recovery_screen.bin')],embed_assets)
+    display=Glob('recovery_screen.c')+[os.path.join(panel,'epd_e0470a03.c'),
+             os.path.join(panel,'sy7636.c')]+assets
+    group+=DefineGroup('Reader527RecoveryDisplay',display,depend=[''],
+        CPPPATH=[drivers,wave,os.path.abspath(os.path.join(cwd,'../../src'))],
+        CPPDEFINES=['READER527_RECOVERY_DISPLAY'],
+        LIBS=[GroupLibName('epd_waveform_bin_reader')],LIBPATH=[wave])
+objs=group+SConscript(os.path.join(cwd,'../common/SConscript'),variant_dir='core',duplicate=0)
+objs+=SConscript(os.path.join(SIFLI_SDK,'SConscript'),variant_dir='sifli_sdk',duplicate=0)
+Return('objs')

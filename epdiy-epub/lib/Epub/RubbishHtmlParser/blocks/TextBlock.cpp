@@ -154,6 +154,7 @@ static bool has_leading_indent(const std::vector<const char*>& spans) {
 // given a renderer works out where to break the words into lines
 void TextBlock::layout(Renderer *renderer, Epub *epub, int max_width)
 {
+    line_breaks.clear();
     int page_width = max_width != -1 ? max_width : renderer->get_page_width();
     bool is_first_line = true; // first line of a paragraph
     int indent_width = 0;

@@ -4,6 +4,8 @@ from building import *
 
 cwd = GetCurrentDir()
 src = Glob('*.cpp')
+if GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+    src = [s for s in src if os.path.basename(str(s)) != 'SF32_ButtonControls.cpp']
 CPPPATH = [cwd]
 
 group = DefineGroup('controls', src,depend = [''],CPPPATH = CPPPATH)

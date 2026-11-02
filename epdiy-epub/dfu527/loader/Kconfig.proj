@@ -1,0 +1,9 @@
+config BF0_HCPU
+    bool
+    default y
+config CUSTOM_MEM_MAP
+    bool
+    default y
+config READER527_RECOVERY
+    bool
+    default y

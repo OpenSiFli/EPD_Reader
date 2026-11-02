@@ -4,6 +4,8 @@ from building import *
 
 cwd = GetCurrentDir()
 src = Glob('*.cpp')
+if GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+    src = []
 CPPPATH = [cwd]
 
 group = DefineGroup('battery', src, depend = [''],CPPPATH = CPPPATH)

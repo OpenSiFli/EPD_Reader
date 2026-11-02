@@ -75,11 +75,15 @@ bool EpubList::load(const char *path)
         continue;
       }
       ulog_d(TAG, "Loading epub %s", ent->d_name);
-      Epub *epub = new Epub(std::string("/") + ent->d_name);
+      std::string base(path);
+      if(base.empty()||base.back()!='/')base+='/';
+      Epub *epub = new Epub(base + ent->d_name);
       if (epub->load())
       {
-        strncpy(state.epub_list[state.num_epubs].path, epub->get_path().c_str(), MAX_PATH_SIZE);
-        strncpy(state.epub_list[state.num_epubs].title, replace_html_entities(epub->get_title()).c_str(), MAX_TITLE_SIZE);
+        strncpy(state.epub_list[state.num_epubs].path, epub->get_path().c_str(), MAX_PATH_SIZE-1);
+        state.epub_list[state.num_epubs].path[MAX_PATH_SIZE-1]=0;
+        strncpy(state.epub_list[state.num_epubs].title, replace_html_entities(epub->get_title()).c_str(), MAX_TITLE_SIZE-1);
+        state.epub_list[state.num_epubs].title[MAX_TITLE_SIZE-1]=0;
         state.num_epubs++;
         if (state.num_epubs == MAX_EPUB_LIST_SIZE)
         {
@@ -114,7 +118,7 @@ bool EpubList::load(const char *path)
     perror("");
     renderer->flush_display();
     ulog_e(TAG, "Is SD-Card inserted and properly connected?\nCould not open directory %s", path);
-    #ifndef UNIT_TEST
+    #if !defined(UNIT_TEST) && !defined(BSP_USING_BOARD_SF32LB527_OED_E0470A03)
       rt_thread_delay(rt_tick_from_millisecond(1000*10));
       RT_ASSERT(0);
     #endif

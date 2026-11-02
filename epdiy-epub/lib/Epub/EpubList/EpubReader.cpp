@@ -12,6 +12,7 @@
 #include "../RubbishHtmlParser/RubbishHtmlParser.h"
 #include "../Renderer/Renderer.h"
 #include "epub_mem.h"
+#include "reader_power.h"
 #include "epub_screen.h"
 extern "C" void epd_font_ft_preheat(const char *text);
 extern "C" void epd_font_ft_preheat_async(const char *text);
@@ -20,6 +21,7 @@ static const char *TAG = "EREADER";
 extern "C" rt_uint32_t heap_free_size(void);
 
 EpubReader::~EpubReader() {
+    renderer->cancel_page_preview();
     stop_layout_thread();
     epd_font_ft_preheat_stop();
     if(epub) delete epub;
@@ -49,7 +51,6 @@ void EpubReader::layout_thread_entry(void *param)
 
 void EpubReader::layout_thread_func()
 {
-    m_layout_running = 1;
     ulog_i(TAG, "Layout thread started");
 
     while (!m_layout_stop && parser && !parser->is_layout_done())
@@ -68,6 +69,7 @@ void EpubReader::layout_thread_func()
            m_layout_stop,
            (parser && parser->is_layout_done()) ? 1 : 0,
            parser ? parser->get_page_count() : 0);
+    reader_power_idle();
     m_layout_running = 0;
 }
 
@@ -83,6 +85,8 @@ void EpubReader::start_layout_thread()
                                         24,
                                         10);
     if (m_layout_thread) {
+        reader_power_busy();
+        m_layout_running = 1; /* Publish before the worker can be stopped. */
         rt_thread_startup(m_layout_thread);
         ulog_i(TAG, "Layout thread created");
     } else {
@@ -96,12 +100,8 @@ void EpubReader::stop_layout_thread()
 
     m_layout_stop = 1;
 
-    for (int i = 0; i < 500 && m_layout_running; i++) {
+    while (m_layout_running) {
         rt_thread_delay(rt_tick_from_millisecond(10));
-    }
-
-    if (m_layout_running) {
-        ulog_e(TAG, "Layout thread did not exit in time!");
     }
 
     m_layout_thread = RT_NULL;
@@ -126,8 +126,9 @@ bool EpubReader::load()
     if (epub->load())
     {
       ulog_d(TAG, "After epub load: %d", heap_free_size());
-      return false;
+      return true;
     }
+    return false;
   }
   return true;
 }
@@ -233,6 +234,7 @@ void EpubReader::prev()
 
 void EpubReader::render()
 {
+  preview_attempted=false;
   if (!parser)
   {
     parse_and_layout_current_section();
@@ -260,11 +262,19 @@ void EpubReader::render()
   ulog_d(TAG, "rendered page %d of %d", state.current_page, parser->get_page_count());
   ulog_d(TAG, "after render: %d", heap_free_size());
 
-  // 章节进度
+  render_progress(state.current_page);
+
+  if (overlay_active)render_overlay();
+  start_layout_thread();
+}
+
+void EpubReader::render_progress(int page)
+{
+  // Same page count, positions and font treatment for preview and actual draw.
   if (state.pages_in_current_section > 0)
   {
     char buf[32];
-    rt_snprintf(buf, sizeof(buf), "%d页/%d页", state.current_page + 1, state.pages_in_current_section);
+    rt_snprintf(buf, sizeof(buf), "%d页/%d页", page + 1, state.pages_in_current_section);
     int page_w = renderer->get_page_width();
     int page_h = renderer->get_page_height();
     int text_w = renderer->get_text_width(buf);
@@ -276,14 +286,24 @@ void EpubReader::render()
     renderer->draw_text(x, y, buf, false, true);
   }
 
-  // 绘制半屏覆盖操作层
-  if (overlay_active)
-  {
-    render_overlay();
-  }
+}
 
-  // render 完成后启动后台线程排剩余页
-  start_layout_thread();
+bool EpubReader::prepare_next_page(int (*cancel)(void *),void *context)
+{
+    if(preview_attempted||overlay_active||!parser||!parser->is_layout_done()||
+       m_layout_running||(cancel&&cancel(context)))return false;
+    preview_attempted=true;
+    update_page_count();
+    int next=state.current_page+1;
+    if(next>=state.pages_in_current_section||!renderer->begin_page_preview())return false;
+    uint32_t start=rt_tick_get();
+    if(!parser->render_text_preview(next,renderer,epub,cancel,context)) {
+        renderer->cancel_page_preview();return false;
+    }
+    render_progress(next);
+    rt_kprintf("READER_PREVIEW section=%u page=%d draw_ms=%u\n",state.current_section,next,rt_tick_get()-start);
+    // Caller adds status bar before asking the panel driver to prepare the wave.
+    return true;
 }
 
 void EpubReader::set_state_section(uint16_t current_section) {
@@ -306,6 +326,14 @@ bool EpubReader::continue_layout()
 bool EpubReader::has_pending_layout()
 {
     return parser && !parser->is_layout_done();
+}
+bool EpubReader::can_auto_advance() const
+{
+    if(!epub||!parser||overlay_active)return false;
+    int count=epub->get_spine_items_count();
+    if(count<=0||state.current_section>=count)return false;
+    if(!parser->is_layout_done())return true;
+    return state.current_section+1<count||state.current_page+1<parser->get_page_count();
 }
 
 /*==========================================================================
@@ -350,8 +378,16 @@ void EpubReader::preheat(int num_sections)
  * 页面锚点
  *========================================================================*/
 
+void EpubReader::pause_background()
+{
+    renderer->cancel_page_preview();
+    stop_layout_thread();
+    epd_font_ft_preheat_stop();
+}
+
 void EpubReader::save_anchor(int &out_block_index, int &out_line_index)
 {
+    pause_background();
     if (!parser) {
         out_block_index = 0;
         out_line_index = 0;
@@ -364,20 +400,23 @@ void EpubReader::save_anchor(int &out_block_index, int &out_line_index)
            state.current_page, out_block_index, out_line_index);
 }
 
-void EpubReader::restore_by_anchor(int block_index, int line_index)
+void EpubReader::restore_by_anchor(int block_index, int line_index, bool exact_line)
 {
-    if (!parser) return;
-
+    uint32_t start = rt_tick_get();
+    if (!parser) parse_and_layout_current_section();
     stop_layout_thread();
-    if (!parser->is_layout_done()) {
-        parser->layout_continue(0);
-        update_page_count();
-    }
-
     PageAnchor anchor;
     anchor.block_index = block_index;
     anchor.line_index = line_index;
-    int new_page = parser->find_page_by_anchor(anchor);
+    int new_page;
+    while (!parser->is_layout_done()) {
+        new_page=parser->find_page_by_anchor(anchor,exact_line);
+        if(new_page>=0&&(!exact_line||new_page<parser->get_page_count()-1))break;
+        parser->layout_continue(1);
+    }
+    new_page=parser->find_page_by_anchor(anchor,exact_line);
+    update_page_count();
+    rt_kprintf("FONT_ANCHOR ms=%u pages_ready=%d\n", rt_tick_get()-start, parser->get_page_count());
     if (new_page >= 0) {
         state.current_page = new_page;
         ulog_i(TAG, "Anchor restored: block=%d, line=%d -> page=%d",
@@ -386,6 +425,17 @@ void EpubReader::restore_by_anchor(int block_index, int line_index)
         ulog_w(TAG, "Anchor not found (block=%d, line=%d), staying at page %d",
                block_index, line_index, state.current_page);
     }
+}
+
+void EpubReader::reflow_by_anchor(int block_index, int line_index)
+{
+    pause_background();
+    uint32_t start = rt_tick_get();
+    renderer->set_margin_bottom(renderer->get_line_height()+10);
+    if (parser) parser->layout(renderer, epub, 1);
+    restore_by_anchor(block_index, line_index);
+    rt_kprintf("FONT_REFLOW ms=%u chapter_reused=1\n", rt_tick_get()-start);
+    render();
 }
 
 /*==========================================================================

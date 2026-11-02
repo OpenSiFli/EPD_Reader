@@ -3,6 +3,8 @@ import rtconfig
 
 # get current dir path
 cwd = GetCurrentDir()
+if GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+    cwd = os.path.join(cwd, 'e0470a03')
 
 # init src and inc vars
 src = []

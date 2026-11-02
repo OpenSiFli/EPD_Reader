@@ -23,6 +23,7 @@ int screen_get_timeout_shutdown_minutes();
 
 // 获取当前主页面选中的选项(0:打开书库 1:进入设置 2:查看天气 3:继续阅读)
 MainOption screen_get_main_selected_option();
+void screen_set_main_selected_option(MainOption option);
 
 // 主页面交互与渲染
 void handleMainPage(Renderer *renderer, UIAction action, bool needs_redraw);

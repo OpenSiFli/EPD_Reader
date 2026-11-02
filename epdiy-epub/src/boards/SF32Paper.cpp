@@ -1,3 +1,5 @@
+#include <rtconfig.h>
+#if !defined(BSP_USING_BOARD_SF32LB527_OED_E0470A03)
 
 #include "SF32Paper.h"
 #include "SF32PaperRenderer.h"
@@ -242,3 +244,5 @@ TouchControls *SF32Paper::get_touch_controls(Renderer *renderer, rt_mq_t ui_queu
   });
 }
 
+
+#endif

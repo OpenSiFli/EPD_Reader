@@ -44,6 +44,9 @@ public:
   virtual void clear_screen() = 0;
   virtual void flush_display(){};
   virtual void flush_area(int x, int y, int width, int height){};
+  virtual bool begin_page_preview(){return false;}
+  virtual void end_page_preview(int (*cancel)(void *),void *context){}
+  virtual void cancel_page_preview(){}
 
   virtual int get_page_width() = 0;
   virtual int get_page_height() = 0;
@@ -54,6 +57,8 @@ public:
   void set_margin_bottom(int margin_bottom) { this->margin_bottom = margin_bottom; }
   void set_margin_left(int margin_left) { this->margin_left = margin_left; }
   void set_margin_right(int margin_right) { this->margin_right = margin_right; }
+  int get_margin_top() const { return margin_top; }
+  int get_margin_left() const { return margin_left; }
   // deep sleep helper - persist any state to disk that may be needed on wake
   virtual bool dehydrate() { return false; };
   // deep sleep helper - retrieve any state from disk after wake

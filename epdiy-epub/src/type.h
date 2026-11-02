@@ -1,5 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
+#include <rtconfig.h>
 
 // 设置页列表项
 typedef enum { 
@@ -8,7 +9,15 @@ typedef enum {
   SET_FULL_REFRESH = 2, 
   SET_BLUETOOTH = 3,
   SET_READING_SETTINGS = 4,  // 阅读设置（字体/字号/行距/边距）
-  SET_CONFIRM = 5 
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+  SET_FRONTLIGHT = 5,
+  SET_USB_DFU = 6,
+  SET_AUTO_TURN = 7,
+  SET_STANDBY = 8,
+  SET_CONFIRM = 9
+#else
+  SET_CONFIRM = 5
+#endif
 } SettingsItem;
 
 typedef enum {
@@ -23,6 +32,8 @@ typedef enum {
   WELCOME_PAGE,        // 欢迎页面
   LOW_POWER_PAGE,      // 低电量页面
   CHARGING_PAGE,       // 充电页面
-  SHUTDOWN_PAGE        // 关机页面
+  SHUTDOWN_PAGE,       // 关机页面
+  FRONTLIGHT_PAGE,
+  USB_DFU_PAGE
 } AppUIState;
 #endif

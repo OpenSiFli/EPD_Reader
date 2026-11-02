@@ -1,7 +1,7 @@
 #include <rtdbg.h>
 #include "Board.h"
 #include "SF32Paper.h"
-#ifndef SF32LB57X
+#if !defined(SF32LB57X) && !defined(BSP_USING_BOARD_SF32LB527_OED_E0470A03)
 #include "battery/ADCBattery.h"
 #endif
 
@@ -23,7 +23,7 @@ void Board::stop_filesystem()
 
 Battery *Board::get_battery(rt_mq_t ui_queue)
 {
-#ifndef SF32LB57X
+#if !defined(SF32LB57X) && !defined(BSP_USING_BOARD_SF32LB527_OED_E0470A03)
   return new ADCBattery(ui_queue);
 #else
   (void)ui_queue;

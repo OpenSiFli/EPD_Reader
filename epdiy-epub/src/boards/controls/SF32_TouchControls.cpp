@@ -8,8 +8,11 @@
 
 #include "UIRegionsManager.h"
 #include "reading_settings.h"
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+#include "boards/sf32lb527/reader_ui.h"
+#endif
 
-#ifdef BSP_USING_TOUCHD
+#if defined(BSP_USING_TOUCHD) || defined(BSP_USING_BOARD_SF32LB527_OED_E0470A03)
     #include "drv_touch.h"
 #endif
 
@@ -51,6 +54,25 @@ rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
     x = LCD_VER_RES_MAX - touch_data.y - 1;
     y = touch_data.x;
 
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+    if (x>=684 || y>=1216) return RT_EOK;
+    if(x<instance->renderer->get_margin_left()||y<instance->renderer->get_margin_top())return RT_EOK;
+    x-=instance->renderer->get_margin_left();y-=instance->renderer->get_margin_top();
+    if (touch_data.event==TOUCH_EVENT_NONE) {
+        instance->is_touch_down=false;is_touch_started=false;return RT_EOK;
+    }
+    if (touch_data.event==TOUCH_EVENT_DOWN) {
+        instance->touch_start_y=y;instance->is_touch_down=true;return RT_EOK;
+    }
+    if (touch_data.event==TOUCH_EVENT_MOVE) return RT_EOK;
+    if (touch_data.event!=TOUCH_EVENT_UP || !instance->is_touch_down) return RT_EOK;
+    instance->is_touch_down=false;
+    if (reader && !reader->is_overlay_active() && instance->touch_start_y-y>SWIPE_THRESHOLD) {
+        instance->on_action(UPGLIDE);return RT_EOK;
+    }
+    /* A tap is dispatched once on release. No repeats during a held contact. */
+    touch_data.event=TOUCH_EVENT_DOWN;
+#else
   if (TOUCH_EVENT_DOWN == touch_data.event) 
     {
         rt_kprintf("Touch down [%d,%d]\r\n", x, y);
@@ -97,11 +119,33 @@ rt_err_t SF32_TouchControls::tp_rx_indicate(rt_device_t dev, rt_size_t size)
       return RT_EOK;
   }
 
+#endif
   UIAction action = NONE;
 
 switch (ui_state)
 {
   case MAIN_PAGE:
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+    for(int n=0;n<OPTION_COUNT;++n) {
+        AreaRect &a=g_area_array[n];
+        if(x>=a.start_x&&x<=a.end_x&&y>=a.start_y&&y<=a.end_y) {
+            screen_set_main_selected_option((MainOption)n);action=SELECT;break;
+        }
+    }
+    break;
+  case FRONTLIGHT_PAGE:
+    for(int n=0;n<6;++n) {
+        AreaRect &a=g_area_array[n];
+        if(x>=a.start_x&&x<=a.end_x&&y>=a.start_y&&y<=a.end_y){reader527_light_hit=n;action=SELECT;break;}
+    }
+    break;
+  case USB_DFU_PAGE:
+    for(int n=0;n<2;++n) {
+        AreaRect &a=g_area_array[n];
+        if(x>=a.start_x&&x<=a.end_x&&y>=a.start_y&&y<=a.end_y){reader527_dfu_hit=n;action=SELECT;break;}
+    }
+    break;
+#else
     if (x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y)
     {
       rt_kprintf("Touch left < \n");
@@ -118,6 +162,7 @@ switch (ui_state)
       rt_kprintf("Touch middle SELECT \n");
     }
     break;
+#endif
   case WEATHER_PAGE:
     if (x >= g_area_array[0].start_x && x <= g_area_array[0].end_x && y >= g_area_array[0].start_y && y <= g_area_array[0].end_y)
     {
@@ -304,6 +349,17 @@ switch (ui_state)
     }
     break;
   case SETTINGS_PAGE:
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+    for(int n=SET_TIMEOUT;n<=SET_CONFIRM;++n)for(int part=0;part<3;++part) {
+        AreaRect &a=g_area_array[n*3+part];
+        if(a.end_x<=a.start_x||a.end_y<=a.start_y)continue;
+        if(x>=a.start_x&&x<=a.end_x&&y>=a.start_y&&y<=a.end_y) {
+            settings_selected_idx=n;
+            action=part==0?PREV_OPTION:part==1?NEXT_OPTION:SELECT_BOX;
+        }
+    }
+    break;
+#endif
     if (x >= g_area_array[SET_TOUCH * 3 + 2].start_x && x <= g_area_array[SET_TOUCH * 3 + 2].end_x &&
         y >= g_area_array[SET_TOUCH * 3 + 2].start_y && y <= g_area_array[SET_TOUCH * 3 + 2].end_y)
     {
@@ -422,7 +478,7 @@ SF32_TouchControls::SF32_TouchControls(Renderer *renderer, ActionCallback_t on_a
 {
     tp_device = rt_device_find("touch");
 
-      if (RT_EOK == rt_device_open(tp_device, RT_DEVICE_FLAG_RDONLY))
+      if (tp_device && RT_EOK == rt_device_open(tp_device, RT_DEVICE_FLAG_RDONLY))
       {
           /*Setup rx indicate callback*/
           tp_device->user_data = (void *)this;

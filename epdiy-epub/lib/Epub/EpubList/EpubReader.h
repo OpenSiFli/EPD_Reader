@@ -16,6 +16,8 @@ private:
   Renderer *renderer = nullptr;
   RubbishHtmlParser *parser = nullptr;
   int m_layout_batch_size = 1;
+  bool preview_attempted=false;
+  void render_progress(int page);
 
   // --- 后台排版线程 ---
   rt_thread_t  m_layout_thread = RT_NULL;
@@ -35,7 +37,11 @@ private:
   int overlay_target_page = 1;
   // 覆盖层中心属性模式：触控开关 或 全刷周期
   enum OverlayCenterMode { CENTER_TOUCH = 0, CENTER_FULL_REFRESH = 1 };
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+  OverlayCenterMode overlay_center_mode = CENTER_FULL_REFRESH;
+#else
   OverlayCenterMode overlay_center_mode = CENTER_TOUCH;
+#endif
   // 触控开关当前状态（由上层同步）
   bool overlay_touch_enabled = false;
   // 全刷周期索引：0->5, 1->10, 2->20, 3->每次(0)
@@ -53,18 +59,24 @@ public:
   void prev();
   void jump_pages(int delta);
   void render();
+  bool prepare_next_page(int (*cancel)(void *),void *context);
   void set_state_section(uint16_t current_section);
   void preheat(int num_sections = 1);
 
   // 后台排版（主循环空闲时调用）
   bool continue_layout();
   bool has_pending_layout();
+  bool can_auto_advance() const;
+  bool has_pending_preview() const { return !overlay_active && !preview_attempted; }
 
   // 保存当前阅读位置的锚点（进入设置前调用）
+  void pause_background();
+  void reflow_by_anchor(int block_index, int line_index);
   void save_anchor(int &out_block_index, int &out_line_index);
 
-  // 字体/排版变更后，根据锚点重新定位页码（排完全部后调用）
-  void restore_by_anchor(int block_index, int line_index);
+  // 字体/排版变更后，根据锚点排到目标页，其余继续后台排版
+  void restore_by_anchor(int block_index, int line_index, bool exact_line=false);
+  void resume_background(){preview_attempted=false;start_layout_thread();}
 
   // 覆盖层控制
   void start_overlay() { overlay_active = true; overlay_selected = 0; overlay_jump_acc = 0; overlay_target_page = state.current_page + 1; }
@@ -81,7 +93,14 @@ public:
   void overlay_adjust_target_page(int d);
   int overlay_get_target_page() const { return overlay_target_page; }
   // 覆盖层中心属性控制
-  void overlay_set_center_mode_touch() { overlay_center_mode = CENTER_TOUCH; }
+  void overlay_set_center_mode_touch() {
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+    // This board has no verified physical controls to re-enable touch.
+    overlay_center_mode = CENTER_FULL_REFRESH;
+#else
+    overlay_center_mode = CENTER_TOUCH;
+#endif
+  }
   void overlay_set_center_mode_full_refresh() { overlay_center_mode = CENTER_FULL_REFRESH; }
   bool overlay_is_center_touch() const { return overlay_center_mode == CENTER_TOUCH; }
   void overlay_set_touch_enabled(bool en) { overlay_touch_enabled = en; }

@@ -14,7 +14,11 @@ PrepareEnv()
 ################################## change rtconfig.xxx to customize build ########################################
 
 # Add bootloader project
-AddBootLoader(SIFLI_SDK,rtconfig.CHIP)
+if GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+    AddChildProj('bootloader',os.path.join(GetCurrentDir(),'../dfu527/boot'),False)
+    AddChildProj('recovery',os.path.join(GetCurrentDir(),'../dfu527/loader'),False)
+else:
+    AddBootLoader(SIFLI_SDK,rtconfig.CHIP)
 
 # Add LCPU project
 AddLCPU(SIFLI_SDK,rtconfig.CHIP,"../../src/lcpu_img.c")
@@ -41,13 +45,16 @@ AddFTAB(SIFLI_SDK,rtconfig.CHIP)
 
 
 # Add existing file system image bin
-fs_bin=FileSystemBuild( "../disk", env)
-AddCustomImg("fs_root",bin=[fs_bin])
+if not GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+    fs_bin=FileSystemBuild( "../disk", env)
+    AddCustomImg("fs_root",bin=[fs_bin])
 
 
 # Add EPD wave form image bin
 if GetDepend('EPD_WAVEFORM_USE_BIN'):
     epd_wave_bin="../waveform/epd_waveform.bin"
+    if GetDepend('BSP_USING_BOARD_SF32LB527_OED_E0470A03'):
+        epd_wave_bin="../waveform/e0470a03/epd_waveform.bin"
     AddCustomImg("wave_table",bin=[epd_wave_bin])
 
 # Generate download .bat script

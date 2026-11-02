@@ -1,0 +1,5 @@
+from building import *
+import os
+cwd=GetCurrentDir()
+group=DefineGroup('SF32LB527Drivers',Glob('*.c')+Glob('*.cpp'),depend=['BSP_USING_BOARD_SF32LB527_OED_E0470A03'],CPPPATH=[cwd,os.path.join(cwd,'../../..','waveform','e0470a03')])
+Return('group')

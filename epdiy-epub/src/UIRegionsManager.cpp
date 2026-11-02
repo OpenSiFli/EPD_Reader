@@ -38,6 +38,7 @@ bool static_add_area(int x, int y, int width, int height ,int index)
     g_area_array[index].start_y = y;
     g_area_array[index].end_x = x + width;
     g_area_array[index].end_y = y + height;
+    if(index>=g_area_count)g_area_count=index+1;
     
     return true;
 }

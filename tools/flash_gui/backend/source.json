@@ -1,0 +1,7 @@
+{
+  "revision": "sf32lb52-fix-20261102",
+  "upstream": "https://github.com/OpenSiFli/sftool.git",
+  "commit": "7dabb3d8eced77433419264a348ba630a567af01",
+  "patch": "sf32lb52-erase-stub.patch",
+  "patch_sha256": "e8c09ee83dd6f350e89e11588cf292f6b918487393020c7c0b6600d86ec5f24e"
+}

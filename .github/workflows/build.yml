@@ -21,6 +21,7 @@ jobs:
           - sf32-oed-epd_v11
           - sf32-oed-epd_v12
           - sf32-oed-epd_v12_spi
+          - sf32lb527-oed-e0470a03
       fail-fast: false
     
     name: Build ${{ matrix.target }}
@@ -35,6 +36,30 @@ jobs:
       run: |
         cd SiFli-SDK
         ./install.sh
+
+    - name: Check SF32LB527 cache and settings writer
+      if: matrix.target == 'sf32lb527-oed-e0470a03'
+      run: |
+        python3 tools/test_527_cache.py
+        python3 tools/test_settings_save.py
+        python3 tools/test_auto_turn.py
+        python3 tools/test_font_io.py
+        python3 tools/test_reader_reflow.py
+        python3 tools/test_527_power_measure.py
+        python3 tools/test_527_lcpu_sleep.py
+        python3 tools/test_527_minimum_power.py
+        python3 tools/test_527_standby_clock.py
+        python3 tools/test_527_standby_resume.py
+        python3 tools/test_527_clock_ram.py
+        python3 tools/test_527_power_steps.py
+        python3 tools/test_527_power_boot.py
+        python3 tools/test_527_touch_power.py
+        python3 tools/test_527_tf_power.py
+        python3 tools/test_527_dfu.py
+        python3 tools/test_527_boot_key.py
+        python3 tools/test_527_recovery_screen.py
+        python3 tools/test_527_dfu_package.py
+        python3 -m unittest discover -s tools/flash_gui -p 'test_*.py' -v
         
     - name: Build ${{ matrix.target }}
       run: |
@@ -42,6 +67,12 @@ jobs:
         source ./export.sh
         cd ../epdiy-epub/project
         scons --board=${{ matrix.target }} --board_search_path=.. -j$(nproc)
+
+    - name: Package SF32LB527 images
+      if: matrix.target == 'sf32lb527-oed-e0470a03'
+      run: |
+        python3 tools/package_527.py --output epdiy-epub/project/build_sf32lb527-oed-e0470a03_hcpu/usb_update
+        python3 tools/package_527.py --factory --output epdiy-epub/project/build_sf32lb527-oed-e0470a03_hcpu/factory_install
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -101,4 +132,3 @@ jobs:
           ### Installation
           1. Extract the zip file for your target board
           2. Flash the binaries to your EPD reader device
-          

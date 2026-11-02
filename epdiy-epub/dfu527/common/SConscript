@@ -1,0 +1,3 @@
+from building import *
+group=DefineGroup('Reader527UpdateCore',Glob('*.c'),depend=[''],CPPPATH=[GetCurrentDir()])
+Return('group')

@@ -257,6 +257,9 @@ void RubbishHtmlParser::layout(Renderer *renderer, Epub *epub, int target_pages)
     m_layout_done = false;
 
     rt_mutex_take(m_pages_mutex, RT_WAITING_FOREVER);
+    // Reflow a retained chapter after font/geometry changes without ZIP/XML I/O.
+    for (auto page : pages) delete page;
+    pages.clear();
     pages.push_back(new Page());
     rt_mutex_release(m_pages_mutex);
 
@@ -313,6 +316,23 @@ void RubbishHtmlParser::layout_continue(int target_pages)
 /*==========================================================================
  * render_page — 持锁渲染
  *========================================================================*/
+bool RubbishHtmlParser::render_text_preview(int index,Renderer *renderer,Epub *epub,int (*cancel)(void *),void *context)
+{
+    rt_mutex_take(m_pages_mutex,RT_WAITING_FOREVER);
+    bool ok=index>=0&&index<(int)pages.size();
+    // Image decoding can block cancellation for seconds. Preview completed text
+    // pages first, checking input between lines; regular rendering handles images.
+    if(ok)for(auto element:pages[index]->elements)if(element->is_image()){ok=false;break;}
+    if(ok) {
+        renderer->clear_screen();
+        for(auto element:pages[index]->elements) {
+            if(cancel&&cancel(context)){ok=false;break;}
+            element->render(renderer,epub);
+        }
+    }
+    rt_mutex_release(m_pages_mutex);return ok;
+}
+
 void RubbishHtmlParser::render_page(int page_index, Renderer *renderer, Epub *epub)
 {
   renderer->clear_screen();
@@ -405,7 +425,7 @@ PageAnchor RubbishHtmlParser::get_page_anchor(int page_index)
  * 对于 TextBlock，尽量找到包含 anchor.line_index 对应文本的页
  * （但由于字体变化，行号可能不同，所以匹配到同一个 block 就算成功）。
  *========================================================================*/
-int RubbishHtmlParser::find_page_by_anchor(const PageAnchor &anchor)
+int RubbishHtmlParser::find_page_by_anchor(const PageAnchor &anchor, bool exact_line)
 {
   // 先根据 block_index 找到目标 block 指针
   Block *target_block = nullptr;
@@ -424,7 +444,7 @@ int RubbishHtmlParser::find_page_by_anchor(const PageAnchor &anchor)
   for (int p = 0; p < (int)pages.size(); p++) {
     for (auto elem : pages[p]->elements) {
       PageLine *pl = dynamic_cast<PageLine *>(elem);
-      if (pl && pl->block == target_block) {
+      if (pl && pl->block == target_block && (!exact_line||pl->line_break_index>=anchor.line_index)) {
         rt_mutex_release(m_pages_mutex);
         return p;
       }
@@ -437,5 +457,5 @@ int RubbishHtmlParser::find_page_by_anchor(const PageAnchor &anchor)
   }
 
   rt_mutex_release(m_pages_mutex);
-  return 0;  // 没找到，回到第 0 页
+  return -1; // Not in the laid-out prefix yet; caller can extend it incrementally.
 }

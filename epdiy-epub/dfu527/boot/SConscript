@@ -1,0 +1,12 @@
+import os
+from building import *
+Import('SIFLI_SDK')
+cwd=GetCurrentDir()
+upstream=os.path.join(SIFLI_SDK,'example/boot_loader/project/butterflmicro/board')
+VariantDir('upstream',upstream,duplicate=0)
+src=[node for node in Glob('upstream/*.c') if os.path.basename(str(node))!='main.c']
+src += Glob('boot_entry.c')
+group=DefineGroup('Reader527Boot',src,depend=[''],CPPPATH=[upstream,os.path.join(cwd,'../common')])
+objs=group+SConscript(os.path.join(cwd,'../common/SConscript'),variant_dir='core',duplicate=0)
+objs+=SConscript(os.path.join(SIFLI_SDK,'SConscript'),variant_dir='sifli_sdk',duplicate=0)
+Return('objs')

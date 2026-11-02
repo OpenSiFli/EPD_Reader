@@ -10,6 +10,7 @@
 #include "epd_driver.h"
 #include "font_ft.h"
 #include "epub_mem.h"
+#include "reader_power.h"
 #include "rtdbg.h"
 #include <rtthread.h>
 #include <string.h>
@@ -65,7 +66,11 @@ typedef struct CachedGlyph {
 
 #define CACHE_HASH_SIZE  256
 #define CACHE_HASH_MASK  (CACHE_HASH_SIZE - 1)
+#ifdef BSP_USING_BOARD_SF32LB527_OED_E0470A03
+#define CACHE_MAX_MEMORY (768 * 1024)
+#else
 #define CACHE_MAX_MEMORY (3 * 1024 * 1024)
+#endif
 
 static CachedGlyph *g_hash_table[CACHE_HASH_SIZE];
 static CachedGlyph  g_lru_sentinel;
@@ -204,49 +209,80 @@ static void post_init(void) {
 /*==========================================================================
  * Public init / deinit / setters
  *========================================================================*/
-int epd_font_ft_init(const uint8_t *ttf_data, int ttf_size, int pixel_size) {
-    if (!ttf_data || ttf_size <= 0) return -1;
-    epd_font_ft_preheat_stop(); ensure_library(); if (!g_ft_library) return -1; ensure_mutex();
-    if (g_ft_face) { FT_Done_Face(g_ft_face); g_ft_face = NULL; }
-    if (g_font_valid) { cache_clear(); cmap_cache_clear(); g_font_valid = 0; }
-    if (FT_New_Memory_Face(g_ft_library, ttf_data, ttf_size, 0, &g_ft_face)) { ulog_e(LOG_TAG, "FT_New_Memory_Face failed"); return -1; }
-    g_font_valid = 1; g_pixel_size = pixel_size;
-    memset(g_hash_table, 0, sizeof(g_hash_table));
-    g_lru_sentinel.lru_next = &g_lru_sentinel; g_lru_sentinel.lru_prev = &g_lru_sentinel;
-    g_cache_count = 0; g_cache_memory = 0; cmap_cache_clear(); post_init();
-    ulog_i(LOG_TAG, "Font ready (memory): size=%d ascent=%d descent=%d var_weight=%d", g_pixel_size, g_ascent, g_descent, g_has_weight_axis);
+/* The old face remains usable if opening/validating the replacement fails.
+ * Face creation/destruction and all glyph consumers share this mutex. */
+static int install_face(FT_Face face, int pixel_size)
+{
+    if (FT_Set_Pixel_Sizes(face, 0, pixel_size)) {
+        FT_Done_Face(face);
+        return -1;
+    }
+    cache_clear();
+    cmap_cache_clear();
+    if (g_ft_face) FT_Done_Face(g_ft_face);
+    g_ft_face = face;
+    g_font_valid = 1;
+    g_pixel_size = pixel_size;
+    post_init();
     return 0;
+}
+
+static int font_open_begin(void)
+{
+    epd_font_ft_preheat_stop();
+    ensure_mutex();
+    if (!g_ft_mutex) return -1;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
+    ensure_library();
+    if (!g_ft_library) { rt_mutex_release(g_ft_mutex); return -1; }
+    return 0;
+}
+
+int epd_font_ft_init(const uint8_t *ttf_data, int ttf_size, int pixel_size) {
+    if (!ttf_data || ttf_size <= 0 || pixel_size <= 0 || font_open_begin()) return -1;
+    FT_Face face = NULL;
+    int result = FT_New_Memory_Face(g_ft_library, ttf_data, ttf_size, 0, &face);
+    if (!result) result = install_face(face, pixel_size);
+    rt_mutex_release(g_ft_mutex);
+    return result ? -1 : 0;
 }
 int epd_font_ft_init_from_file(const char *path, int pixel_size) {
-    if (!path) return -1;
-    epd_font_ft_preheat_stop(); ensure_library(); if (!g_ft_library) return -1; ensure_mutex();
-    if (g_ft_face) { FT_Done_Face(g_ft_face); g_ft_face = NULL; }
-    if (g_font_valid) { cache_clear(); cmap_cache_clear(); g_font_valid = 0; }
-    if (FT_New_Face(g_ft_library, path, 0, &g_ft_face)) { ulog_e(LOG_TAG, "FT_New_Face failed: %s", path); return -1; }
-    g_font_valid = 1; g_pixel_size = pixel_size;
-    memset(g_hash_table, 0, sizeof(g_hash_table));
-    g_lru_sentinel.lru_next = &g_lru_sentinel; g_lru_sentinel.lru_prev = &g_lru_sentinel;
-    g_cache_count = 0; g_cache_memory = 0; cmap_cache_clear(); post_init();
-    ulog_i(LOG_TAG, "Font ready (file): size=%d ascent=%d descent=%d var_weight=%d", g_pixel_size, g_ascent, g_descent, g_has_weight_axis);
-    return 0;
+    if (!path || pixel_size <= 0 || font_open_begin()) return -1;
+    FT_Face face = NULL;
+    uint32_t start = rt_tick_get();
+    int result = FT_New_Face(g_ft_library, path, 0, &face);
+    if (!result) result = install_face(face, pixel_size);
+    rt_kprintf("FONT_FACE_OPEN ms=%u result=%d size=%d\n", rt_tick_get()-start, result, pixel_size);
+    rt_mutex_release(g_ft_mutex);
+    return result ? -1 : 0;
 }
 void epd_font_ft_deinit(void) {
-    epd_font_ft_preheat_stop(); cache_clear(); cmap_cache_clear();
+    epd_font_ft_preheat_stop();
+    if (!g_ft_mutex) return;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
+    cache_clear(); cmap_cache_clear();
     if (g_ft_face) { FT_Done_Face(g_ft_face); g_ft_face = NULL; }
     g_font_valid = 0; g_has_weight_axis = 0; g_weight_axis_index = -1; g_num_axes = 0;
+    rt_mutex_release(g_ft_mutex);
 }
 void epd_font_ft_set_size(int pixel_size) {
-    if (pixel_size == g_pixel_size) return;
+    if (pixel_size <= 0 || pixel_size == g_pixel_size || !g_ft_mutex) return;
     epd_font_ft_preheat_stop();
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
     g_pixel_size = pixel_size; cache_clear(); cmap_cache_clear(); recalc_metrics();
+    rt_mutex_release(g_ft_mutex);
 }
 int  epd_font_ft_get_size(void) { return g_pixel_size; }
 void epd_font_ft_set_line_spacing(float s) { g_line_spacing = s; }
 void epd_font_ft_set_bold(int level) {
     if (level < 0) level = 0; if (level > 2) level = 2;
     if (level == g_bold_level) return;
-    epd_font_ft_preheat_stop(); g_bold_level = level; cache_clear(); cmap_cache_clear();
+    epd_font_ft_preheat_stop();
+    if (!g_ft_mutex) return;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
+    g_bold_level = level; cache_clear(); cmap_cache_clear();
     if (g_has_weight_axis) { apply_variable_weight(BOLD_WEIGHT_MAP[level]); recalc_metrics(); }
+    rt_mutex_release(g_ft_mutex);
 }
 int  epd_font_ft_get_bold(void)           { return g_bold_level; }
 int  epd_font_ft_is_variable_weight(void) { return g_has_weight_axis; }
@@ -255,7 +291,13 @@ int  epd_font_ft_get_descent(void)        { return g_descent; }
 int  epd_font_ft_get_line_height(void)    { return (int)((g_ascent - g_descent + g_line_gap) * g_line_spacing); }
 int  epd_font_ft_cache_count(void)        { return g_cache_count; }
 int  epd_font_ft_cache_memory(void)       { return g_cache_memory; }
-void epd_font_ft_cache_clear(void)        { epd_font_ft_preheat_stop(); cache_clear(); cmap_cache_clear(); }
+void epd_font_ft_cache_clear(void) {
+    epd_font_ft_preheat_stop();
+    if (!g_ft_mutex) return;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
+    cache_clear(); cmap_cache_clear();
+    rt_mutex_release(g_ft_mutex);
+}
 
 /*==========================================================================
  * rasterize_glyph — 线程安全版本
@@ -265,9 +307,9 @@ void epd_font_ft_cache_clear(void)        { epd_font_ft_preheat_stop(); cache_cl
  * 相比 TF 卡 I/O 的 2-10ms 和缓存命中的 memcpy 可忽略不计。
  *========================================================================*/
 static CachedGlyph *rasterize_glyph(uint32_t codepoint) {
-    if (!g_font_valid || !g_ft_face) return NULL;
-
+    if (!g_ft_mutex) return NULL;
     rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
+    if (!g_font_valid || !g_ft_face) { rt_mutex_release(g_ft_mutex); return NULL; }
 
     /* 缓存命中 — 加锁后查找，保护 LRU 链表操作 */
     CachedGlyph *cached = cache_lookup(codepoint);
@@ -335,11 +377,14 @@ static EpdGlyph g_tmp_glyph;
 
 const EpdGlyph *epd_get_glyph(const EpdFont *font, uint32_t code_point) {
     (void)font;
+    if (!g_ft_mutex) return NULL;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
     CachedGlyph *cg = rasterize_glyph(code_point);
-    if (!cg) return NULL;
+    if (!cg) { rt_mutex_release(g_ft_mutex); return NULL; }
     g_tmp_glyph.width = cg->width; g_tmp_glyph.height = cg->height;
     g_tmp_glyph.advance_x = cg->advance_x; g_tmp_glyph.left = cg->left; g_tmp_glyph.top = cg->top;
     g_tmp_glyph.compressed_size = 0; g_tmp_glyph.data_offset = 0;
+    rt_mutex_release(g_ft_mutex);
     return &g_tmp_glyph;
 }
 
@@ -352,9 +397,11 @@ static inline int imin(int a, int b) { return a < b ? a : b; }
 static inline int imax(int a, int b) { return a > b ? a : b; }
 
 static enum EpdDrawError draw_char(uint8_t *buffer, int *cursor_x, int cursor_y, uint32_t cp, const EpdFontProperties *props) {
+    if (!g_ft_mutex) return EPD_DRAW_GLYPH_FALLBACK_FAILED;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
     CachedGlyph *cg = rasterize_glyph(cp);
     if (!cg && props->fallback_glyph) cg = rasterize_glyph(props->fallback_glyph);
-    if (!cg) return EPD_DRAW_GLYPH_FALLBACK_FAILED;
+    if (!cg) { rt_mutex_release(g_ft_mutex); return EPD_DRAW_GLYPH_FALLBACK_FAILED; }
     uint8_t width = cg->width, height = cg->height;
     int left = cg->left, byte_width = (width + 1) / 2;
     const uint8_t *bitmap = cg->bitmap_4bpp;
@@ -372,13 +419,16 @@ static enum EpdDrawError draw_char(uint8_t *buffer, int *cursor_x, int cursor_y,
         }
     }
     *cursor_x += cg->advance_x;
+    rt_mutex_release(g_ft_mutex);
     return EPD_DRAW_SUCCESS;
 }
 
 static void get_char_bounds(uint32_t cp, int *x, int *y, int *minx, int *miny, int *maxx, int *maxy, const EpdFontProperties *props) {
+    if (!g_ft_mutex) return;
+    rt_mutex_take(g_ft_mutex, RT_WAITING_FOREVER);
     CachedGlyph *cg = rasterize_glyph(cp);
     if (!cg && props->fallback_glyph) cg = rasterize_glyph(props->fallback_glyph);
-    if (!cg) return;
+    if (!cg) { rt_mutex_release(g_ft_mutex); return; }
     int x1 = *x + cg->left, y1 = *y + (-(int)cg->top), x2 = x1 + cg->width, y2 = y1 + cg->height;
     if (props->flags & EPD_DRAW_BACKGROUND) {
         *minx = imin(*x, imin(*minx, x1)); *maxx = imax(imax(*x + cg->advance_x, x2), *maxx);
@@ -388,6 +438,7 @@ static void get_char_bounds(uint32_t cp, int *x, int *y, int *minx, int *miny, i
         if (x2 > *maxx) *maxx = x2; if (y2 > *maxy) *maxy = y2;
     }
     *x += cg->advance_x;
+    rt_mutex_release(g_ft_mutex);
 }
 
 /*==========================================================================
@@ -498,7 +549,6 @@ static char *g_preheat_text = NULL;
 static void preheat_thread_entry(void *param)
 {
     (void)param;
-    g_preheat_running = 1;
     const uint8_t *p = (const uint8_t *)g_preheat_text;
     uint32_t cp;
     int total = 0, old_count = g_cache_count;
@@ -522,7 +572,8 @@ static void preheat_thread_entry(void *param)
     ulog_i(LOG_TAG, "Async preheat done: %d chars, %d new glyphs, total=%d (%d KB)",
            total, g_cache_count - old_count, g_cache_count, g_cache_memory / 1024);
 
-    if (g_preheat_text) { rt_free(g_preheat_text); g_preheat_text = NULL; }
+    if (g_preheat_text) { epub_mem_free(g_preheat_text); g_preheat_text = NULL; }
+    reader_power_idle();
     g_preheat_running = 0;
 }
 
@@ -532,7 +583,7 @@ void epd_font_ft_preheat_async(const char *text)
     epd_font_ft_preheat_stop();
 
     int len = strlen(text);
-    g_preheat_text = (char *)rt_malloc(len + 1);
+    g_preheat_text = (char *)epub_mem_malloc(len + 1);
     if (!g_preheat_text) { ulog_e(LOG_TAG, "Async preheat: malloc failed (%d)", len+1); return; }
     memcpy(g_preheat_text, text, len + 1);
     g_preheat_stop = 0;
@@ -540,11 +591,15 @@ void epd_font_ft_preheat_async(const char *text)
     g_preheat_thread = rt_thread_create("ft_pre", preheat_thread_entry, RT_NULL,
                                          16384, 25, 10);
     if (g_preheat_thread) {
+        /* Publish running before startup: stop must join a scheduled-but-not-
+         * entered worker too, before freeing its text or replacing FT_Face. */
+        reader_power_busy();
+        g_preheat_running=1;
         rt_thread_startup(g_preheat_thread);
         ulog_i(LOG_TAG, "Async preheat thread started (%d bytes)", len);
     } else {
         ulog_e(LOG_TAG, "Failed to create preheat thread");
-        rt_free(g_preheat_text); g_preheat_text = NULL;
+        epub_mem_free(g_preheat_text); g_preheat_text = NULL;
     }
 }
 
@@ -553,12 +608,11 @@ void epd_font_ft_preheat_stop(void)
     if (!g_preheat_running && g_preheat_thread == RT_NULL) return;
     g_preheat_stop = 1;
     if (g_preheat_thread != RT_NULL) {
-        for (int i = 0; i < 500 && g_preheat_running; i++)
+        while(g_preheat_running)
             rt_thread_delay(rt_tick_from_millisecond(10));
-        if (g_preheat_running) ulog_e(LOG_TAG, "Preheat thread did not exit!");
         g_preheat_thread = RT_NULL;
     }
-    if (g_preheat_text) { rt_free(g_preheat_text); g_preheat_text = NULL; }
+    if (g_preheat_text) { epub_mem_free(g_preheat_text); g_preheat_text = NULL; }
     g_preheat_stop = 0;
 }
 

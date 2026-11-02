@@ -1,0 +1,8 @@
+import os
+import rtconfig
+from building import *
+PrepareEnv()
+SifliEnv()
+objs=PrepareBuilding(None)
+env=GetCurrentEnv()
+DoBuilding(os.path.join(env['build_dir'],rtconfig.TARGET_NAME+'.'+rtconfig.TARGET_EXT),objs)

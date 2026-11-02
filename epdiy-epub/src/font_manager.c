@@ -107,9 +107,8 @@ int font_manager_select(int index, int pixel_size)
     rt_kprintf("[font_mgr] Switching to font [%d] %s\n",
                index, g_font_list[index].name);
 
-    /* 清缓存 + 释放旧 FT_Face */
-    epd_font_ft_cache_clear();
-    epd_font_ft_deinit();
+    uint32_t start = rt_tick_get();
+    /* FreeType installs a validated replacement atomically; failures keep the old face. */
 
     if (g_font_list[index].is_builtin) {
         /* 内置字体：Flash XIP，通过 FT_New_Memory_Face */
@@ -119,19 +118,18 @@ int font_manager_select(int index, int pixel_size)
             return -2;
         }
     } else {
-        /* TF 卡字体：FreeType 直接从文件读取，不占 PSRAM */
+        /* TF font: bounded PSRAM read cache; never load the complete TTF. */
         int ret = epd_font_ft_init_from_file(g_font_list[index].path, pixel_size);
         if (ret != 0) {
             rt_kprintf("[font_mgr] ERROR: init from file failed: %s\n",
                        g_font_list[index].path);
-            /* 回退到内置字体 */
-            epd_font_ft_init_builtin(pixel_size);
-            g_current_font = 0;
+            /* Keep both the selected index and the working old face. */
             return -4;
         }
     }
 
     g_current_font = index;
+    rt_kprintf("FONT_SWITCH ms=%u index=%d\n", rt_tick_get()-start, index);
     rt_kprintf("[font_mgr] Font switched OK: [%d] %s\n",
                index, g_font_list[index].name);
     return 0;
