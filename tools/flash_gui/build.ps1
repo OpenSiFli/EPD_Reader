@@ -16,7 +16,7 @@ if ($backendInfo.commit -ne $sourceInfo.commit -or $backendInfo.revision -ne $so
 }
 $outputPath = [System.IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
-$buildPath = Join-Path $env:TEMP 'SiFliFlashTool-build-1.1.1'
+$buildPath = Join-Path $env:TEMP 'SiFliFlashTool-build-1.2.0'
 New-Item -ItemType Directory -Force -Path "$buildPath/backend" | Out-Null
 Copy-Item -LiteralPath $Sftool -Destination "$buildPath/backend/sftool.exe"
 Copy-Item -LiteralPath $BackendManifest -Destination "$buildPath/backend/backend-build.json"

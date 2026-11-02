@@ -240,17 +240,41 @@ def find_sftool() -> Path | None:
 def command(tool: Path, port: str, chip: str, memory: str, baud: str,
             before: str, after: str, verify: bool, images: list[Image]) -> list[str]:
     validate(images)
+    args = connection_command(tool, port, chip, memory, baud, before, after) + ['write_flash']
+    if verify:
+        args.append('--verify')
+    return args + [f'{i.path}@0x{i.address:08X}' for i in images]
+
+
+def connection_command(tool: Path, port: str, chip: str, memory: str, baud: str,
+                       before: str, after: str) -> list[str]:
     if not tool.is_file():
         raise ValueError('请选择有效的 sftool.exe。')
     if not port or chip not in CHIPS or memory not in MEMORIES or before not in BEFORE or after not in AFTER:
         raise ValueError('请检查串口、芯片、存储类型和复位选项。')
     if not str(baud).isdigit() or not 9600 <= int(baud) <= 4000000:
         raise ValueError('波特率应为 9600–4000000。')
-    args = [str(tool), '-p', port, '-c', chip, '-m', memory, '-b', str(baud),
-            '--before', before, '--after', after, 'write_flash']
-    if verify:
-        args.append('--verify')
-    return args + [f'{i.path}@0x{i.address:08X}' for i in images]
+    return [str(tool), '-p', port, '-c', chip, '-m', memory, '-b', str(baud),
+            '--before', before, '--after', after]
+
+
+def erase_command(tool: Path, port: str, chip: str, memory: str, baud: str,
+                  before: str, after: str, kind: str, start: str | int,
+                  length: str | int | None = None) -> list[str]:
+    args = connection_command(tool, port, chip, memory, baud, before, after)
+    if memory not in ('nor', 'nor_type1'):
+        raise ValueError('当前擦除界面只支持 NOR Flash，请选择 NOR 存储类型。')
+    start = address(start)
+    if kind == 'all':
+        if start % 0x1000000:
+            raise ValueError('整片擦除请输入 Flash 映射起始地址（如 0x12000000），不能使用应用分区地址。')
+        return args + ['erase_flash', f'0x{start:08X}']
+    if kind != 'region':
+        raise ValueError('请选择整片擦除或指定范围擦除。')
+    length = address(length)
+    if not length or start % 4096 or length % 4096 or start + length > 0x100000000:
+        raise ValueError('范围擦除的地址、长度必须按 4KB 对齐，长度大于零且不能超出 32 位地址范围。')
+    return args + ['erase_region', f'0x{start:08X}:0x{length:X}']
 
 
 def run(args: list[str], emit, cancel: threading.Event, cwd: Path) -> int:

@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 import zipfile
 
-from flash_core import Image, address, command, find_sftool, load_package, read_text, run, validate
+from flash_core import Image, address, command, erase_command, find_sftool, load_package, read_text, run, validate
 
 
 class Tests(unittest.TestCase):
@@ -86,6 +86,32 @@ class Tests(unittest.TestCase):
         path.write_text(path.read_text(encoding='gb18030').replace('12200000', '12400000'), encoding='utf-8')
         with self.assertRaises(ValueError):
             load_package(self.root)
+
+    def erase(self, kind, start, length=None, memory='nor'):
+        return erase_command(Path(sys.executable), 'COM_TEST', 'SF32LB52', memory,
+                             '1000000', 'default_reset', 'soft_reset', kind, start, length)
+
+    def test_erase_region_without_images(self):
+        args = self.erase('region', '0x12FFF000', '0x1000')
+        self.assertEqual(args[-2:], ['erase_region', '0x12FFF000:0x1000'])
+        self.assertNotIn('--verify', args)
+
+    def test_erase_whole_bank(self):
+        self.assertEqual(self.erase('all', '0x12000000')[-2:], ['erase_flash', '0x12000000'])
+        with self.assertRaises(ValueError):
+            self.erase('all', '0x12200000')
+
+    def test_erase_alignment_length_and_overflow(self):
+        for first, size in [('0x12000001', '0x1000'), ('0x12000000', '0x1'),
+                            ('0x12000000', '0x0'), ('0xFFFFF000', '0x2000')]:
+            with self.subTest(first=first, size=size), self.assertRaises(ValueError):
+                self.erase('region', first, size)
+
+    def test_erase_rejects_non_nor_and_invalid_kind(self):
+        with self.assertRaises(ValueError):
+            self.erase('all', '0x12000000', memory='nand')
+        with self.assertRaises(ValueError):
+            self.erase('invalid', '0x12000000')
 
     def test_bad_zip_paths(self):
         for name in ('../escape.bin', '/absolute.bin', 'C:/escape.bin'):

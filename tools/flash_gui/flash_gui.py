@@ -11,10 +11,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from serial.tools import list_ports
-from flash_core import AFTER, BEFORE, CHIPS, MEMORIES, Image, address, command, find_sftool, load_package, run, validate
+from flash_core import AFTER, BEFORE, CHIPS, MEMORIES, Image, address, command, erase_command, find_sftool, load_package, run, validate
 from usb_core import Cancelled, prepare_update, recovery_port, run_usb, select_targets
 
-VERSION = '1.1.1'
+VERSION = '1.2.0'
 
 
 class App(tk.Tk):
@@ -27,6 +27,7 @@ class App(tk.Tk):
         self.events = queue.Queue()
         self.cancel = threading.Event()
         self.mode = 'idle'
+        self.serial_operation = '烧录'
         self.rows = {}
         self.packages = []
         self.log_handle = None
@@ -54,8 +55,8 @@ class App(tk.Tk):
         self._build()
         self.scan_ports()
         self.apply_transport()
-        self.after(80, self.poll)
-        self.after(1500, self.rescan)
+        self.poll_timer = self.after(80, self.poll)
+        self.rescan_timer = self.after(1500, self.rescan)
         self.protocol('WM_DELETE_WINDOW', self.close)
 
     def _style(self):
@@ -166,6 +167,8 @@ class App(tk.Tk):
         action.pack(fill='x')
         self.start_button = self.button(action, '开始烧录', self.start, style='Accent.TButton')
         self.start_button.pack(side='left')
+        self.erase_button = self.button(action, '擦除 Flash…', self.erase_dialog)
+        self.erase_button.pack(side='left', padx=(8, 0))
         self.stop_button = ttk.Button(action, text='停止烧录', command=self.stop, state='disabled')
         self.stop_button.pack(side='left', padx=8)
         self.progress = ttk.Progressbar(action, maximum=100)
@@ -204,7 +207,7 @@ class App(tk.Tk):
     def rescan(self):
         if self.mode == 'idle' and self.transport.get() == 'usb':
             self.scan_ports()
-        self.after(1500, self.rescan)
+        self.rescan_timer = self.after(1500, self.rescan)
 
     def apply_transport(self):
         usb = self.transport.get() == 'usb'
@@ -215,6 +218,7 @@ class App(tk.Tk):
         self.ports = self.usb_ports if usb else self.serial_ports
         self.start_button['text'] = '开始 USB 升级' if usb else '开始烧录'
         self.stop_button['text'] = '停止升级' if usb else '停止烧录'
+        self.erase_button.state(['disabled'] if usb or self.mode != 'idle' else ['!disabled'])
         self.files_frame['text'] = ('USB 升级列表 · 仅应用、字体和波形三个固定分区' if usb
                                     else '烧录列表 · 地址为十六进制，可双击编辑')
         self.footer_text.set('USB 升级写入固定的三个分区；校验通过后自动重启。' if usb else '空片首刷与完整重烧使用下载 UART；原生 USB 端口请切换到 USB DFU 模式。')
@@ -268,6 +272,11 @@ class App(tk.Tk):
             else:
                 widget.state(['!disabled'])
         self.stop_button['state'] = 'normal' if mode == 'flashing' else 'disabled'
+        if self.transport.get() == 'usb':
+            self.erase_button.state(['disabled'])
+        self.stop_button['text'] = ('停止等待' if mode == 'flashing' and self.transport.get() == 'serial'
+                                    and self.serial_operation == '擦除' else
+                                    '停止升级' if self.transport.get() == 'usb' else '停止烧录')
 
     def import_path(self, path):
         if self.mode != 'idle':
@@ -394,28 +403,101 @@ class App(tk.Tk):
             port = self.port_names.get(self.port.get(), '')
             args = command(Path(self.tool.get()), port, self.chip.get(), self.memory.get(),
                            self.baud.get(), self.before.get(), self.after_reset.get(), self.verify.get(), images)
+        except Exception as error:
+            messagebox.showerror('无法开始烧录', str(error), parent=self)
+            return
+        self.start_serial(args, '烧录', images[0].path.parent,
+                          f'正在烧录 {len(images)} 个文件，请保持串口和供电连接。')
+
+    def start_serial(self, args, operation, cwd, status):
+        if self.mode != 'idle' or self.transport.get() != 'serial':
+            return
+        try:
             log_dir = Path(os.environ.get('LOCALAPPDATA', Path.home()))/'SiFliFlashTool/logs'
             log_dir.mkdir(parents=True, exist_ok=True)
             self.log_path = log_dir/(datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.log')
             self.log_handle = self.log_path.open('w', encoding='utf-8')
         except Exception as error:
-            messagebox.showerror('无法开始烧录', str(error), parent=self)
+            messagebox.showerror(f'无法开始{operation}', str(error), parent=self)
             return
         self.cancel.clear()
         self.progress['value'] = 0
         self.percent.set('当前阶段：0%')
+        self.serial_operation = operation
         self.busy('flashing')
-        self.status.set(f'正在烧录 {len(images)} 个文件，请保持串口和供电连接。')
-        self.append_log('\n' + datetime.now().isoformat(timespec='seconds') + ' 开始烧录')
+        self.status.set(status)
+        self.append_log('\n' + datetime.now().isoformat(timespec='seconds') + f' 开始{operation}')
         self.append_log(subprocess.list2cmdline(args))
         self.append_log(f'自动日志：{self.log_path}')
         def worker():
             try:
-                code = run(args, lambda kind, value: self.events.put((kind, value)), self.cancel, images[0].path.parent)
+                code = run(args, lambda kind, value: self.events.put((kind, value)), self.cancel, cwd)
                 self.events.put(('done', (code, self.cancel.is_set())))
             except Exception as error:
-                self.events.put(('error', f'烧录执行失败：{error}'))
+                self.events.put(('error', f'{operation}执行失败：{error}'))
         threading.Thread(target=worker, daemon=True).start()
+
+    def erase_dialog(self):
+        if self.mode != 'idle' or self.transport.get() != 'serial':
+            return
+        if self.memory.get() not in ('nor', 'nor_type1'):
+            messagebox.showerror('不支持的存储类型', '当前擦除界面只支持 NOR Flash。', parent=self)
+            return
+        dialog = tk.Toplevel(self)
+        dialog.title('擦除 NOR Flash')
+        dialog.geometry('750x390')
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+        frame = ttk.Frame(dialog, padding=20)
+        frame.pack(fill='both', expand=True)
+        frame.columnconfigure(1, weight=1)
+        ttk.Label(frame, text=f'目标串口：{self.port.get() or "未选择"}    芯片：{self.chip.get()}').grid(
+            row=0, column=0, columnspan=3, sticky='w', pady=(0, 16))
+        kind = tk.StringVar(value='region')
+        start = tk.StringVar(value='0x12000000' if self.chip.get() == 'SF32LB52' else '0x10000000')
+        length = tk.StringVar(value='0x1000')
+        choices = ttk.Frame(frame)
+        choices.grid(row=1, column=0, columnspan=3, sticky='w', pady=(0, 12))
+        ttk.Radiobutton(choices, text='指定范围（4KB 对齐）', variable=kind, value='region').pack(side='left')
+        ttk.Radiobutton(choices, text='整片擦除', variable=kind, value='all').pack(side='left', padx=30)
+        ttk.Label(frame, text='起始地址（十六进制）').grid(row=2, column=0, sticky='w', pady=8)
+        ttk.Entry(frame, textvariable=start, width=26).grid(row=2, column=1, sticky='w', padx=12)
+        ttk.Label(frame, text='长度（十六进制字节）').grid(row=3, column=0, sticky='w', pady=8)
+        length_entry = ttk.Entry(frame, textvariable=length, width=26)
+        length_entry.grid(row=3, column=1, sticky='w', padx=12)
+        hint = tk.StringVar()
+        def update_hint(*_):
+            length_entry.state(['disabled'] if kind.get() == 'all' else ['!disabled'])
+            hint.set('整片容量由下载程序识别；起始地址应为 Flash 映射起址，不能填写应用分区地址。'
+                     if kind.get() == 'all' else '例如：地址 0x12FFF000、长度 0x1000，表示擦除最后 4KB（527 的 16MB 布局）。')
+        kind.trace_add('write', update_hint)
+        update_hint()
+        ttk.Label(frame, textvariable=hint, wraplength=690, style='Muted.TLabel').grid(
+            row=4, column=0, columnspan=3, sticky='w', pady=(12, 10))
+        ttk.Label(frame, text='擦除会删除目标范围的数据。整片擦除会删除引导、USB 恢复程序和应用；请先保存需要的备份。',
+                  wraplength=690, foreground='#b45309').grid(row=5, column=0, columnspan=3, sticky='w', pady=(0, 16))
+        def execute():
+            try:
+                port = self.port_names.get(self.port.get(), '')
+                args = erase_command(Path(self.tool.get()), port, self.chip.get(), self.memory.get(),
+                                     self.baud.get(), self.before.get(), self.after_reset.get(), kind.get(),
+                                     start.get(), length.get() if kind.get() == 'region' else None)
+                first = address(start.get())
+                target = (f'整片 NOR，Flash 映射起址 0x{first:08X}；容量由设备识别'
+                          if kind.get() == 'all' else
+                          f'0x{first:08X}–0x{first+address(length.get())-1:08X}，共 {address(length.get()):,} 字节')
+            except Exception as error:
+                messagebox.showerror('擦除参数无效', str(error), parent=dialog)
+                return
+            if not messagebox.askyesno('确认擦除', f'串口：{port}\n芯片：{self.chip.get()} / {self.memory.get()}\n范围：{target}\n\n目标数据将被删除。确认执行擦除？',
+                                       parent=dialog, default='no', icon='warning'):
+                return
+            dialog.destroy()
+            self.start_serial(args, '擦除', Path(self.tool.get()).resolve().parent,
+                              f'正在擦除 {port}：{target}，请保持供电和连接。')
+        ttk.Button(frame, text='执行擦除', command=execute).grid(row=6, column=1, sticky='e')
+        ttk.Button(frame, text='取消', command=dialog.destroy).grid(row=6, column=2, padx=(12, 0))
 
     def usb_action(self, action):
         if self.mode != 'idle' or self.transport.get() != 'usb':
@@ -454,10 +536,12 @@ class App(tk.Tk):
     def stop(self):
         prompt = ('停止后设备保留在 USB 恢复模式，可能需要重新完整升级。是否停止？' if self.transport.get() == 'usb'
                   else '停止后固件可能不完整，需要重新完整烧录。是否停止？')
+        if self.transport.get() == 'serial' and self.serial_operation == '擦除':
+            prompt = '这会停止上位机等待，不能撤销已发出的擦除命令；设备可能仍在擦除。是否停止等待？'
         if self.mode == 'flashing' and messagebox.askyesno('停止当前操作', prompt, parent=self):
             self.cancel.set()
             self.stop_button['state'] = 'disabled'
-            self.status.set('正在停止烧录…')
+            self.status.set('正在停止等待…' if self.serial_operation == '擦除' and self.transport.get() == 'serial' else '正在停止操作…')
 
     def finish_log(self):
         if self.log_handle:
@@ -511,13 +595,15 @@ class App(tk.Tk):
                 code, cancelled = value
                 self.busy('idle')
                 if cancelled:
-                    result = '已停止 · 固件可能不完整，请重新完整烧录'
+                    result = ('已停止等待 · 已发出的擦除可能仍在执行，请重新连接确认'
+                              if self.serial_operation == '擦除' else '已停止 · 固件可能不完整，请重新完整烧录')
                 elif code == 0:
-                    result = '烧录完成，sftool 返回成功' + ('，写后校验已启用' if self.verify.get() else '（未启用写后校验）')
+                    result = ('擦除完成，sftool 返回成功' if self.serial_operation == '擦除' else
+                              '烧录完成，sftool 返回成功' + ('，写后校验已启用' if self.verify.get() else '（未启用写后校验）'))
                     self.progress['value'] = 100
                     self.percent.set('完成')
                 else:
-                    result = f'烧录失败（退出码 {code}），请检查日志、下载模式及串口连接'
+                    result = f'{self.serial_operation}失败（退出码 {code}），请检查日志、下载模式及串口连接'
                 self.status.set(result)
                 self.append_log(result)
                 self.finish_log()
@@ -527,7 +613,7 @@ class App(tk.Tk):
                 self.append_log(value)
                 self.finish_log()
                 messagebox.showerror('操作失败', value, parent=self)
-        self.after(80, self.poll)
+        self.poll_timer = self.after(80, self.poll)
 
     def save_log(self):
         path = filedialog.asksaveasfilename(title='保存运行日志', defaultextension='.log', filetypes=[('日志', '*.log'), ('文本', '*.txt')])
@@ -542,6 +628,8 @@ class App(tk.Tk):
             messagebox.showinfo('正在执行任务', '请等待加载完成，或先停止烧录，再关闭工具。', parent=self)
             return
         self.finish_log()
+        self.after_cancel(self.poll_timer)
+        self.after_cancel(self.rescan_timer)
         for package in self.packages:
             package.close()
         self.destroy()
